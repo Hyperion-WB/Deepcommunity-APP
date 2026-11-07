@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # 必须具备写入权限以发布 Release
+  contents: write
 
 jobs:
   build:
@@ -25,14 +25,8 @@ jobs:
           java-version: '21'
           cache: 'gradle'
 
-      - name: Ensure Gradle Wrapper Executable
-        run: |
-          if [ ! -f "gradlew" ]; then
-            echo "Installing gradle to generate wrapper..."
-            sudo apt-get update && sudo apt-get install -y gradle
-            gradle wrapper
-          fi
-          chmod +x gradlew
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace
