@@ -1,0 +1,287 @@
+package top.deepcommunity.app.data.repository
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.serialization.json.Json
+import top.deepcommunity.app.core.common.Resource
+import top.deepcommunity.app.core.network.WebSocketManager
+import top.deepcommunity.app.data.api.ChatApi
+import top.deepcommunity.app.data.model.ChatMessageDto
+import top.deepcommunity.app.data.model.ConversationDto
+import top.deepcommunity.app.data.model.ErrorResponse
+import top.deepcommunity.app.data.model.GroupMemberDto
+import top.deepcommunity.app.data.model.GroupRoomDto
+import top.deepcommunity.app.data.model.KickMemberRequest
+import top.deepcommunity.app.data.model.SendMessageRequest
+import top.deepcommunity.app.data.model.StickerListResponse
+import top.deepcommunity.app.data.model.UpdateGroupRoomRequest
+import top.deepcommunity.app.data.model.UpdateMemberRoleRequest
+import java.util.UUID
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class ChatRepository @Inject constructor(
+    private val chatApi: ChatApi,
+    private val webSocketManager: WebSocketManager,
+    private val json: Json
+) {
+    // 监听 WebSocket 推送消息
+    val incomingRealtime: Flow<String> = webSocketManager.incomingMessages
+
+    fun connectWebSocket() {
+        webSocketManager.connect()
+    }
+
+    // 私聊
+    fun getConversations(): Flow<Resource<List<ConversationDto>>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.getConversations()
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("加载会话列表失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun createOrGetConversation(targetUserId: String): Flow<Resource<ConversationDto>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.createOrGetConversation(targetUserId)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("发起会话失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun getMessages(convId: String, page: Int = 1, size: Int = 50): Flow<Resource<List<ChatMessageDto>>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.getMessages(convId, page, size)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("加载聊天记录失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun sendMessage(
+        convId: String,
+        content: String,
+        replyToMessageId: String? = null
+    ): Flow<Resource<ChatMessageDto>> = flow {
+        val clientMsgId = UUID.randomUUID().toString()
+        val request = SendMessageRequest(
+            content = content,
+            clientMsgId = clientMsgId,
+            replyToMessageId = replyToMessageId
+        )
+        try {
+            val response = chatApi.sendMessage(convId, request)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string())))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "发送异常"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun recallMessage(msgId: String): Flow<Resource<Unit>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.recallMessage(msgId)
+            if (response.isSuccessful) {
+                emit(Resource.Success(Unit))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "撤回失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "撤回异常"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun markConversationRead(convId: String): Flow<Resource<Unit>> = flow {
+        try {
+            chatApi.markConversationRead(convId)
+            emit(Resource.Success(Unit))
+        } catch (_: Exception) {
+            emit(Resource.Error("标记失败"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    // 群聊
+    fun getGroups(): Flow<Resource<List<GroupRoomDto>>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.getGroups()
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("获取群聊失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun getGroupMessages(roomId: String, page: Int = 1, size: Int = 50): Flow<Resource<List<ChatMessageDto>>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.getGroupMessages(roomId, page, size)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("获取群消息失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun sendGroupMessage(
+        roomId: String,
+        content: String,
+        replyToMessageId: String? = null
+    ): Flow<Resource<ChatMessageDto>> = flow {
+        val clientMsgId = UUID.randomUUID().toString()
+        val request = SendMessageRequest(
+            content = content,
+            clientMsgId = clientMsgId,
+            replyToMessageId = replyToMessageId
+        )
+        try {
+            val response = chatApi.sendGroupMessage(roomId, request)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string())))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "发送异常"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun recallGroupMessage(roomId: String, msgId: String): Flow<Resource<Unit>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.recallGroupMessage(roomId, msgId)
+            if (response.isSuccessful) {
+                emit(Resource.Success(Unit))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "撤回失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "撤回异常"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun getGroupMembers(roomId: String): Flow<Resource<List<GroupMemberDto>>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.getGroupMembers(roomId)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("获取群成员失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun leaveGroup(roomId: String): Flow<Resource<Unit>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.leaveGroup(roomId)
+            if (response.isSuccessful) {
+                emit(Resource.Success(Unit))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "退出群聊失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun kickGroupMember(roomId: String, userId: String): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.kickGroupMember(roomId, KickMemberRequest(userId))
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.message ?: "移出群聊成功"))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "操作失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun updateMemberRole(roomId: String, targetUserId: String, role: String): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.updateMemberRole(roomId, targetUserId, UpdateMemberRoleRequest(role))
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.message ?: "设置成功"))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "操作失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun updateGroupRoom(roomId: String, name: String?, description: String?, announcement: String?): Flow<Resource<GroupRoomDto>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.updateGroupRoom(roomId, UpdateGroupRoomRequest(name, description, announcement))
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "更新失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    // 表情包
+    fun getMyStickers(): Flow<Resource<StickerListResponse>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.getMyStickers()
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("加载表情包失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    private fun parseError(errorJson: String?): String {
+        if (errorJson.isNullOrBlank()) return "请求失败"
+        return try {
+            val err = json.decodeFromString<ErrorResponse>(errorJson)
+            err.detail ?: err.message ?: "操作未成功"
+        } catch (_: Exception) {
+            "服务开小差了，请稍后再试"
+        }
+    }
+}

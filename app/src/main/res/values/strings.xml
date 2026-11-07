@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">深度社区</string>
+    <string name="shortcut_create_post_short">发布动态</string>
+    <string name="shortcut_create_post_long">发布极客技术动态</string>
+    <string name="shortcut_chat_short">社区会话</string>
+    <string name="shortcut_chat_long">查看私聊与群聊会话</string>
+</resources>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="shortcut_create_post"
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher_foreground"
+        android:shortcutShortLabel="@string/shortcut_create_post_short"
+        android:shortcutLongLabel="@string/shortcut_create_post_long">
+        <intent
+            android:action="top.deepcommunity.app.ACTION_CREATE_POST"
+            android:targetPackage="top.deepcommunity.app"
+            android:targetClass="top.deepcommunity.app.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="shortcut_chat"
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher_foreground"
+        android:shortcutShortLabel="@string/shortcut_chat_short"
+        android:shortcutLongLabel="@string/shortcut_chat_long">
+        <intent
+            android:action="top.deepcommunity.app.ACTION_CHAT"
+            android:targetPackage="top.deepcommunity.app"
+            android:targetClass="top.deepcommunity.app.MainActivity" />
+    </shortcut>
+</shortcuts>
