@@ -149,9 +149,19 @@ fun MainScreen(
                     MainTab.CREATE -> {} // 浮动发帖按钮
                     MainTab.NOTIFICATION -> NotificationScreen(
                         viewModel = notificationViewModel,
-                        onNotificationClick = { postId: String? ->
-                            if (!postId.isNullOrBlank()) {
-                                onNavigateToPostDetail(postId)
+                        onNotificationClick = { notif ->
+                            val targetId = notif.targetId
+                            if (!targetId.isNullOrBlank()) {
+                                when (notif.actionType) {
+                                    "group_apply", "group_apply_approved", "group_apply_rejected",
+                                    "group_invite", "group_owner_transferred", "chat_message",
+                                    "group_room" -> {
+                                        onNavigateToChatDetail(targetId)
+                                    }
+                                    else -> {
+                                        onNavigateToPostDetail(targetId)
+                                    }
+                                }
                             }
                         }
                     )

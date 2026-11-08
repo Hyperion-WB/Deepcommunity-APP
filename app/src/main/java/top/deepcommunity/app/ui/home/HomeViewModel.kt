@@ -210,8 +210,22 @@ class HomeViewModel @Inject constructor(
 
         viewModelScope.launch {
             postRepository.toggleLike(postId).collect { result ->
-                if (result is Resource.Error) {
-                    _uiState.update { it.copy(posts = currentPosts) }
+                when (result) {
+                    is Resource.Success -> {
+                        val likeResp = result.data
+                        if (likeResp != null) {
+                            val calibrated = _uiState.value.posts.map {
+                                if (it.id == postId) {
+                                    it.copy(isLiked = likeResp.isLiked, likeCount = likeResp.likeCount)
+                                } else it
+                            }
+                            _uiState.update { it.copy(posts = calibrated) }
+                        }
+                    }
+                    is Resource.Error -> {
+                        _uiState.update { it.copy(posts = currentPosts) }
+                    }
+                    else -> {}
                 }
             }
         }

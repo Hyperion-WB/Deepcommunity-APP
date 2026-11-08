@@ -12,10 +12,12 @@ import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 import top.deepcommunity.app.data.model.CategoryDto
+import top.deepcommunity.app.data.model.CollectResponse
 import top.deepcommunity.app.data.model.CommentDto
 import top.deepcommunity.app.data.model.CreateCommentRequest
 import top.deepcommunity.app.data.model.CreatePostRequest
 import top.deepcommunity.app.data.model.DraftItemDto
+import top.deepcommunity.app.data.model.LikeResponse
 import top.deepcommunity.app.data.model.MessageResponse
 import top.deepcommunity.app.data.model.NotificationDto
 import top.deepcommunity.app.data.model.PollCreateRequest
@@ -47,10 +49,10 @@ interface PostApi {
     suspend fun createPost(@Body request: CreatePostRequest): Response<PostItemDto>
 
     @POST("api/posts/{id}/like")
-    suspend fun toggleLike(@Path("id") id: String): Response<MessageResponse>
+    suspend fun toggleLike(@Path("id") id: String): Response<LikeResponse>
 
     @POST("api/posts/{id}/collect")
-    suspend fun toggleCollect(@Path("id") id: String): Response<MessageResponse>
+    suspend fun toggleCollect(@Path("id") id: String): Response<CollectResponse>
 
     @Multipart
     @POST("api/posts/upload-image")
@@ -88,7 +90,7 @@ interface PostApi {
     suspend fun createComment(@Body request: CreateCommentRequest): Response<CommentDto>
 
     @POST("api/comments/{id}/like")
-    suspend fun toggleCommentLike(@Path("id") commentId: String): Response<MessageResponse>
+    suspend fun toggleCommentLike(@Path("id") commentId: String): Response<LikeResponse>
 
     @DELETE("api/comments/{id}")
     suspend fun deleteComment(@Path("id") commentId: String): Response<MessageResponse>

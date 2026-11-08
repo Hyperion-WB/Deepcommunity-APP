@@ -3,6 +3,15 @@ package top.deepcommunity.app.ui.chat
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import java.util.regex.Pattern
+import androidx.compose.foundation.text.ClickableText
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
+import androidx.compose.material3.LocalTextStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -652,10 +661,14 @@ private fun ChatMessageBubble(
 
     var showMenu by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
-    val isImage = message.msgType == "image" ||
-            message.content.startsWith("/uploads/") ||
-            message.content.startsWith("http://") ||
-            message.content.startsWith("https://")
+    val context = LocalContext.current
+    val isImage = message.msgType == "image" || message.msgType == "sticker" || run {
+        val trimmed = message.content.trim().lowercase()
+        val isImgExt = trimmed.endsWith(".jpg") || trimmed.endsWith(".jpeg") ||
+                trimmed.endsWith(".png") || trimmed.endsWith(".webp") ||
+                trimmed.endsWith(".gif") || trimmed.endsWith(".bmp")
+        isImgExt && (trimmed.startsWith("/uploads/") || trimmed.startsWith("http://") || trimmed.startsWith("https://"))
+    }
 
     // 高亮定位动画
     val highlightColor by animateColorAsState(
@@ -802,12 +815,70 @@ private fun ChatMessageBubble(
                             contentScale = ContentScale.Fit
                         )
                     } else {
-                        Text(
-                            text = message.content,
-                            fontSize = 14.sp,
-                            lineHeight = 20.sp,
-                            color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                        )
+                        // 智能识别文本中的 URL 链接并高亮，支持一键点击在系统浏览器中打开
+                        val content = message.content
+                        val urlPattern = remember { Pattern.compile("https?://[\\w-]+(\\.[\\w-]+)+(/[\\w-./?%&=#@:;+~]*)?") }
+                        val hasUrl = remember(content) { urlPattern.matcher(content).find() }
+                        val linkColor = if (isMe) Color.White else MaterialTheme.colorScheme.primary
+
+                        if (hasUrl) {
+                            val annotatedString = remember(content, linkColor) {
+                                buildAnnotatedString {
+                                    val m = urlPattern.matcher(content)
+                                    var lastIndex = 0
+                                    while (m.find()) {
+                                        val start = m.start()
+                                        val end = m.end()
+                                        append(content.substring(lastIndex, start))
+                                        val url = m.group()
+                                        pushStringAnnotation(tag = "URL", annotation = url)
+                                        withStyle(
+                                            style = SpanStyle(
+                                                color = linkColor,
+                                                textDecoration = TextDecoration.Underline,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        ) {
+                                            append(url)
+                                        }
+                                        pop()
+                                        lastIndex = end
+                                    }
+                                    if (lastIndex < content.length) {
+                                        append(content.substring(lastIndex))
+                                    }
+                                }
+                            }
+
+                            ClickableText(
+                                text = annotatedString,
+                                style = LocalTextStyle.current.copy(
+                                    fontSize = 14.sp,
+                                    lineHeight = 20.sp,
+                                    color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                ),
+                                onClick = { offset ->
+                                    annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
+                                        .firstOrNull()?.let { annotation ->
+                                            try {
+                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(annotation.item)).apply {
+                                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                                }
+                                                context.startActivity(intent)
+                                            } catch (e: Exception) {
+                                                e.printStackTrace()
+                                            }
+                                        }
+                                }
+                            )
+                        } else {
+                            Text(
+                                text = message.content,
+                                fontSize = 14.sp,
+                                lineHeight = 20.sp,
+                                color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
 

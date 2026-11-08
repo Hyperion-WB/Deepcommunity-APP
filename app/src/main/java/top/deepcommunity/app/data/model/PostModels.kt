@@ -234,6 +234,22 @@ data class CreateCommentRequest(
 )
 
 @Serializable
+data class LikeResponse(
+    @SerialName("is_liked")
+    val isLiked: Boolean = false,
+    @SerialName("like_count")
+    val likeCount: Int = 0
+)
+
+@Serializable
+data class CollectResponse(
+    @SerialName("is_collected")
+    val isCollected: Boolean = false,
+    @SerialName("collect_count")
+    val collectCount: Int = 0
+)
+
+@Serializable
 data class UploadImageResponse(
     val url: String? = null,
     @SerialName("avatar_url")

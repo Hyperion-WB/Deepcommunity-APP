@@ -68,7 +68,7 @@ import kotlin.math.roundToInt
 
 @Composable
 fun NotificationScreen(
-    onNotificationClick: (String?) -> Unit = {},
+    onNotificationClick: (NotificationDto) -> Unit = {},
     viewModel: NotificationViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -200,7 +200,7 @@ fun NotificationScreen(
                             if (!notif.isRead) {
                                 viewModel.markSingleAsRead(notif.id)
                             }
-                            onNotificationClick(notif.targetId)
+                            onNotificationClick(notif)
                         },
                         onMarkAsRead = { viewModel.markSingleAsRead(notif.id) },
                         onDelete = { viewModel.deleteNotification(notif.id) }

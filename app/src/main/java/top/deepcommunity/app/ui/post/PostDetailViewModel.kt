@@ -158,9 +158,25 @@ class PostDetailViewModel @Inject constructor(
 
         viewModelScope.launch {
             postRepository.toggleLike(postId).collect { result ->
-                if (result is Resource.Error) {
-                    _uiState.update { it.copy(post = currentPost) }
-                    _eventFlow.emit(PostDetailEvent.ShowToast("点赞失败"))
+                when (result) {
+                    is Resource.Success -> {
+                        val likeResp = result.data
+                        if (likeResp != null) {
+                            _uiState.update {
+                                it.copy(
+                                    post = _uiState.value.post?.copy(
+                                        isLiked = likeResp.isLiked,
+                                        likeCount = likeResp.likeCount
+                                    )
+                                )
+                            }
+                        }
+                    }
+                    is Resource.Error -> {
+                        _uiState.update { it.copy(post = currentPost) }
+                        _eventFlow.emit(PostDetailEvent.ShowToast("点赞失败: ${result.message}"))
+                    }
+                    else -> {}
                 }
             }
         }
@@ -174,9 +190,24 @@ class PostDetailViewModel @Inject constructor(
 
         viewModelScope.launch {
             postRepository.toggleCollect(postId).collect { result ->
-                if (result is Resource.Error) {
-                    _uiState.update { it.copy(post = currentPost) }
-                    _eventFlow.emit(PostDetailEvent.ShowToast("收藏失败"))
+                when (result) {
+                    is Resource.Success -> {
+                        val collectResp = result.data
+                        if (collectResp != null) {
+                            _uiState.update {
+                                it.copy(
+                                    post = _uiState.value.post?.copy(
+                                        isCollected = collectResp.isCollected
+                                    )
+                                )
+                            }
+                        }
+                    }
+                    is Resource.Error -> {
+                        _uiState.update { it.copy(post = currentPost) }
+                        _eventFlow.emit(PostDetailEvent.ShowToast("收藏失败: ${result.message}"))
+                    }
+                    else -> {}
                 }
             }
         }
@@ -309,9 +340,31 @@ class PostDetailViewModel @Inject constructor(
 
         viewModelScope.launch {
             postRepository.toggleCommentLike(commentId).collect { result ->
-                if (result is Resource.Error) {
-                    // 失败时回滚
-                    loadComments()
+                when (result) {
+                    is Resource.Success -> {
+                        // 使用服务端返回的权威结果同步校准
+                        val likeResp = result.data
+                        if (likeResp != null) {
+                            val refreshed = _uiState.value.comments.map { comment ->
+                                if (comment.id == commentId) {
+                                    comment.copy(isLiked = likeResp.isLiked, likeCount = likeResp.likeCount)
+                                } else {
+                                    val updatedReplies = comment.replies.map { reply ->
+                                        if (reply.id == commentId) {
+                                            reply.copy(isLiked = likeResp.isLiked, likeCount = likeResp.likeCount)
+                                        } else reply
+                                    }
+                                    comment.copy(replies = updatedReplies)
+                                }
+                            }
+                            _uiState.update { it.copy(comments = refreshed) }
+                        }
+                    }
+                    is Resource.Error -> {
+                        // 失败时回滚
+                        loadComments()
+                    }
+                    else -> {}
                 }
             }
         }

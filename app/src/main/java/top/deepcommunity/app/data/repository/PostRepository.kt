@@ -8,11 +8,13 @@ import kotlinx.serialization.json.Json
 import top.deepcommunity.app.core.common.Resource
 import top.deepcommunity.app.data.api.PostApi
 import top.deepcommunity.app.data.model.CategoryDto
+import top.deepcommunity.app.data.model.CollectResponse
 import top.deepcommunity.app.data.model.CommentDto
 import top.deepcommunity.app.data.model.CreateCommentRequest
 import top.deepcommunity.app.data.model.CreatePostRequest
 import top.deepcommunity.app.data.model.DraftItemDto
 import top.deepcommunity.app.data.model.ErrorResponse
+import top.deepcommunity.app.data.model.LikeResponse
 import top.deepcommunity.app.data.model.NotificationDto
 import top.deepcommunity.app.data.model.PollCreateRequest
 import top.deepcommunity.app.data.model.PollDetailDto
@@ -82,11 +84,11 @@ class PostRepository @Inject constructor(
         }
     }.flowOn(Dispatchers.IO)
 
-    fun toggleLike(postId: String): Flow<Resource<Unit>> = flow {
+    fun toggleLike(postId: String): Flow<Resource<LikeResponse>> = flow {
         try {
             val response = postApi.toggleLike(postId)
-            if (response.isSuccessful) {
-                emit(Resource.Success(Unit))
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
             } else {
                 emit(Resource.Error(parseError(response.errorBody()?.string())))
             }
@@ -95,11 +97,11 @@ class PostRepository @Inject constructor(
         }
     }.flowOn(Dispatchers.IO)
 
-    fun toggleCollect(postId: String): Flow<Resource<Unit>> = flow {
+    fun toggleCollect(postId: String): Flow<Resource<CollectResponse>> = flow {
         try {
             val response = postApi.toggleCollect(postId)
-            if (response.isSuccessful) {
-                emit(Resource.Success(Unit))
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
             } else {
                 emit(Resource.Error(parseError(response.errorBody()?.string())))
             }
@@ -227,11 +229,11 @@ class PostRepository @Inject constructor(
         }
     }.flowOn(Dispatchers.IO)
 
-    fun toggleCommentLike(commentId: String): Flow<Resource<Unit>> = flow {
+    fun toggleCommentLike(commentId: String): Flow<Resource<LikeResponse>> = flow {
         try {
             val response = postApi.toggleCommentLike(commentId)
-            if (response.isSuccessful) {
-                emit(Resource.Success(Unit))
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
             } else {
                 emit(Resource.Error(parseError(response.errorBody()?.string())))
             }
