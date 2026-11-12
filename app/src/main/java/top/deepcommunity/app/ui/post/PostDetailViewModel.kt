@@ -25,6 +25,7 @@ import top.deepcommunity.app.data.model.PostItemDto
 import top.deepcommunity.app.data.model.StickerItemDto
 import top.deepcommunity.app.data.repository.ChatRepository
 import top.deepcommunity.app.data.repository.PostRepository
+import top.deepcommunity.app.data.repository.UserRepository
 import java.io.InputStream
 import javax.inject.Inject
 
@@ -56,9 +57,14 @@ sealed interface PostDetailEvent {
 class PostDetailViewModel @Inject constructor(
     private val postRepository: PostRepository,
     private val chatRepository: ChatRepository,
+    private val userRepository: UserRepository,
     @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+
+    val postRepo: PostRepository get() = postRepository
+    val userRepo: UserRepository get() = userRepository
+    val chatRepo: ChatRepository get() = chatRepository
 
     private val postId: String = checkNotNull(savedStateHandle["postId"])
 
@@ -437,6 +443,40 @@ class PostDetailViewModel @Inject constructor(
                     }
                     is Resource.Error -> {
                         _eventFlow.emit(PostDetailEvent.ShowToast(result.message))
+                    }
+                    else -> {}
+                }
+            }
+        }
+    }
+
+    fun acceptComment(commentId: Long) {
+        viewModelScope.launch {
+            postRepository.acceptComment(postId = postId, commentId = commentId).collect { res ->
+                when (res) {
+                    is Resource.Success -> {
+                        _eventFlow.emit(PostDetailEvent.ShowToast("👑 已采纳该回答为最佳答案"))
+                        loadComments()
+                    }
+                    is Resource.Error -> {
+                        _eventFlow.emit(PostDetailEvent.ShowToast(res.message))
+                    }
+                    else -> {}
+                }
+            }
+        }
+    }
+
+    fun featureComment(commentId: Long) {
+        viewModelScope.launch {
+            postRepository.featureComment(postId = postId, commentId = commentId).collect { res ->
+                when (res) {
+                    is Resource.Success -> {
+                        _eventFlow.emit(PostDetailEvent.ShowToast("📌 已精选置顶该评论"))
+                        loadComments()
+                    }
+                    is Resource.Error -> {
+                        _eventFlow.emit(PostDetailEvent.ShowToast(res.message))
                     }
                     else -> {}
                 }

@@ -12,6 +12,7 @@ import top.deepcommunity.app.data.model.ChatMessageDto
 import top.deepcommunity.app.data.model.CollectStickerRequest
 import top.deepcommunity.app.data.model.ConversationDto
 import top.deepcommunity.app.data.model.ErrorResponse
+import top.deepcommunity.app.data.model.GroupApplyRequestDto
 import top.deepcommunity.app.data.model.GroupCheckinStatusDto
 import top.deepcommunity.app.data.model.GroupMemberDto
 import top.deepcommunity.app.data.model.GroupRoomDto
@@ -343,6 +344,64 @@ class ChatRepository @Inject constructor(
             val response = chatApi.unmuteMember(roomId, targetUserId)
             if (response.isSuccessful) {
                 emit(Resource.Success(response.body()?.message ?: "已解除禁言"))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "操作失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    // 删除表情包
+    fun deleteSticker(stickerId: String): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.deleteSticker(stickerId)
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.message ?: "已移除表情"))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "删除失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    // 入群审批
+    fun getGroupRequests(roomId: String): Flow<Resource<List<GroupApplyRequestDto>>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.getGroupRequests(roomId)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("获取审批列表失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun approveGroupRequest(roomId: String, requestId: String): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.approveGroupRequest(roomId, requestId)
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.message ?: "已批准入群"))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "操作失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun rejectGroupRequest(roomId: String, requestId: String): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.rejectGroupRequest(roomId, requestId)
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.message ?: "已拒绝入群申请"))
             } else {
                 emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "操作失败"))
             }

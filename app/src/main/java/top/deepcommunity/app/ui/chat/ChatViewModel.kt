@@ -71,6 +71,8 @@ class ChatViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
+    val chatRepo: ChatRepository get() = chatRepository
+    val userRepo: UserRepository get() = userRepository
     val convId: String = checkNotNull(savedStateHandle["convId"])
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -312,6 +314,21 @@ class ChatViewModel @Inject constructor(
                 when (result) {
                     is Resource.Success -> {
                         _eventFlow.emit(ChatEvent.ShowToast("✓ ${result.data}"))
+                        loadStickers()
+                    }
+                    is Resource.Error -> _eventFlow.emit(ChatEvent.ShowToast(result.message))
+                    else -> {}
+                }
+            }
+        }
+    }
+
+    fun deleteSticker(stickerId: Long) {
+        viewModelScope.launch {
+            chatRepository.deleteSticker(stickerId).collect { result ->
+                when (result) {
+                    is Resource.Success -> {
+                        _eventFlow.emit(ChatEvent.ShowToast("已移除该表情包"))
                         loadStickers()
                     }
                     is Resource.Error -> _eventFlow.emit(ChatEvent.ShowToast(result.message))

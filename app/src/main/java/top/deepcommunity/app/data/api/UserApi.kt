@@ -15,8 +15,12 @@ import top.deepcommunity.app.data.model.AchievementDto
 import top.deepcommunity.app.data.model.BlockActionResponse
 import top.deepcommunity.app.data.model.BlockedUserDto
 import top.deepcommunity.app.data.model.CheckinStatusDetailDto
+import top.deepcommunity.app.data.model.FollowUserItemDto
 import top.deepcommunity.app.data.model.MessageResponse
 import top.deepcommunity.app.data.model.PostItemDto
+import top.deepcommunity.app.data.model.PublicUserProfileDto
+import top.deepcommunity.app.data.model.UpdateDndRequest
+import top.deepcommunity.app.data.model.UpdatePrivacyRequest
 import top.deepcommunity.app.data.model.UploadImageResponse
 import top.deepcommunity.app.data.model.UserDto
 
@@ -70,4 +74,25 @@ interface UserApi {
         @Query("page") page: Int = 1,
         @Query("size") size: Int = 20
     ): Response<List<PostItemDto>>
+
+    @GET("api/users/{username}/followers")
+    suspend fun getFollowers(@Path("username") username: String): Response<List<FollowUserItemDto>>
+
+    @GET("api/users/{username}/following")
+    suspend fun getFollowing(@Path("username") username: String): Response<List<FollowUserItemDto>>
+
+    @POST("api/users/{username}/follow")
+    suspend fun followUser(@Path("username") username: String): Response<MessageResponse>
+
+    @DELETE("api/users/{username}/follow")
+    suspend fun unfollowUser(@Path("username") username: String): Response<MessageResponse>
+
+    @GET("api/users/profile/{username}")
+    suspend fun getUserPublicProfile(@Path("username") username: String): Response<PublicUserProfileDto>
+
+    @PUT("api/users/me/privacy")
+    suspend fun updatePrivacy(@Body request: UpdatePrivacyRequest): Response<MessageResponse>
+
+    @PUT("api/users/me/dnd")
+    suspend fun updateDnd(@Body request: UpdateDndRequest): Response<MessageResponse>
 }

@@ -16,7 +16,9 @@ import top.deepcommunity.app.data.model.CollectResponse
 import top.deepcommunity.app.data.model.CommentDto
 import top.deepcommunity.app.data.model.CreateCommentRequest
 import top.deepcommunity.app.data.model.CreatePostRequest
+import top.deepcommunity.app.data.model.CreateReportRequest
 import top.deepcommunity.app.data.model.DraftItemDto
+import top.deepcommunity.app.data.model.LeaderboardsResponse
 import top.deepcommunity.app.data.model.LikeResponse
 import top.deepcommunity.app.data.model.MessageResponse
 import top.deepcommunity.app.data.model.NotificationDto
@@ -126,4 +128,27 @@ interface PostApi {
     // 全站广播系统公告
     @GET("api/admin/announcement/current")
     suspend fun getCurrentAnnouncement(): Response<SystemAnnouncementDto>
+
+    // 关注博主专属动态流
+    @GET("api/posts/feed/following")
+    suspend fun getFollowingFeed(
+        @Query("page") page: Int = 1,
+        @Query("size") size: Int = 20
+    ): Response<List<PostItemDto>>
+
+    // 评论采纳为最佳答案
+    @PUT("api/comments/{id}/accept")
+    suspend fun acceptComment(@Path("id") commentId: String): Response<MessageResponse>
+
+    // 评论作者精选置顶
+    @PUT("api/comments/{id}/featured")
+    suspend fun featureComment(@Path("id") commentId: String): Response<MessageResponse>
+
+    // 帖子与评论举报
+    @POST("api/admin/reports")
+    suspend fun createReport(@Body request: CreateReportRequest): Response<MessageResponse>
+
+    // 全站风云榜
+    @GET("api/stats/leaderboards")
+    suspend fun getLeaderboards(): Response<LeaderboardsResponse>
 }

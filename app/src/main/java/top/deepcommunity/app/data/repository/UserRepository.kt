@@ -10,7 +10,11 @@ import top.deepcommunity.app.data.api.UserApi
 import top.deepcommunity.app.data.model.AchievementDto
 import top.deepcommunity.app.data.model.BlockedUserDto
 import top.deepcommunity.app.data.model.CheckinStatusDetailDto
+import top.deepcommunity.app.data.model.FollowUserItemDto
 import top.deepcommunity.app.data.model.PostItemDto
+import top.deepcommunity.app.data.model.PublicUserProfileDto
+import top.deepcommunity.app.data.model.UpdateDndRequest
+import top.deepcommunity.app.data.model.UpdatePrivacyRequest
 import top.deepcommunity.app.data.model.UserDto
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -168,6 +172,135 @@ class UserRepository @Inject constructor(
                 emit(Resource.Success(response.body()!!))
             } else {
                 emit(Resource.Error("获取勋章成就失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    // 粉丝与关注列表
+    fun getFollowers(username: String): Flow<Resource<List<FollowUserItemDto>>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = userApi.getFollowers(username)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("加载粉丝列表失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun getFollowing(username: String): Flow<Resource<List<FollowUserItemDto>>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = userApi.getFollowing(username)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("加载关注列表失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    // 他人公开个人主页
+    fun getUserPublicProfile(username: String): Flow<Resource<PublicUserProfileDto>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = userApi.getUserPublicProfile(username)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("加载用户主页失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun followUser(username: String): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = userApi.followUser(username)
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.message ?: "已关注"))
+            } else {
+                emit(Resource.Error("关注失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun unfollowUser(username: String): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = userApi.unfollowUser(username)
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.message ?: "已取消关注"))
+            } else {
+                emit(Resource.Error("取消关注失败: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    // 隐私与免打扰
+    fun updatePrivacy(request: UpdatePrivacyRequest): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = userApi.updatePrivacy(request)
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.message ?: "隐私设置已更新"))
+            } else {
+                emit(Resource.Error("更新失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun updateDnd(request: UpdateDndRequest): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = userApi.updateDnd(request)
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.message ?: "免打扰设置已更新"))
+            } else {
+                emit(Resource.Error("更新失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun updatePrivacy(hidePosts: Boolean, hideCollections: Boolean): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = userApi.updatePrivacy(UpdatePrivacyRequest(hidePosts, hideCollections))
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.message ?: "隐私设置已更新"))
+            } else {
+                emit(Resource.Error("更新失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun updateDnd(dndEnabled: Boolean, dndStart: String, dndEnd: String): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = userApi.updateDnd(UpdateDndRequest(dndEnabled, dndStart, dndEnd))
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.message ?: "免打扰设置已更新"))
+            } else {
+                emit(Resource.Error("更新失败"))
             }
         } catch (e: Exception) {
             emit(Resource.Error(e.localizedMessage ?: "网络错误"))

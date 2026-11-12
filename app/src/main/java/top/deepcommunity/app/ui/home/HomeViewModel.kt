@@ -28,6 +28,7 @@ data class HomeUiState(
     val posts: List<PostItemDto> = emptyList(),
     val categories: List<CategoryDto> = emptyList(),
     val selectedCategoryId: Int? = null,
+    val feedType: String = "recommend", // "recommend" | "following"
     val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
     val isRefreshing: Boolean = false,
@@ -48,6 +49,9 @@ class HomeViewModel @Inject constructor(
     private val searchHistoryManager: SearchHistoryManager,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
+
+    val postRepo: PostRepository get() = postRepository
+    val userRepo: UserRepository get() = userRepository
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -96,6 +100,13 @@ class HomeViewModel @Inject constructor(
                     _uiState.update { it.copy(categories = result.data) }
                 }
             }
+        }
+    }
+
+    fun selectFeedType(feedType: String) {
+        if (_uiState.value.feedType != feedType) {
+            _uiState.update { it.copy(feedType = feedType) }
+            loadPosts(isRefresh = true)
         }
     }
 
@@ -161,13 +172,20 @@ class HomeViewModel @Inject constructor(
 
         viewModelScope.launch {
             val query = _uiState.value.searchQuery.trim().takeIf { it.isNotEmpty() }
-            postRepository.getPosts(
-                page = currentPage,
-                size = pageSize,
-                sortBy = _uiState.value.selectedFilter,
-                categoryId = _uiState.value.selectedCategoryId,
-                query = query
-            ).collect { result ->
+            val isFollowingMode = _uiState.value.feedType == "following"
+            val flow = if (isFollowingMode) {
+                postRepository.getFollowingFeed(page = currentPage, size = pageSize)
+            } else {
+                postRepository.getPosts(
+                    page = currentPage,
+                    size = pageSize,
+                    sortBy = _uiState.value.selectedFilter,
+                    categoryId = _uiState.value.selectedCategoryId,
+                    query = query
+                )
+            }
+
+            flow.collect { result ->
                 when (result) {
                     is Resource.Loading -> {
                         _uiState.update {

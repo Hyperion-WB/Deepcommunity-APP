@@ -273,3 +273,17 @@ data class GroupCheckinStatusDto(
     @SerialName("group_exp")
     val groupExp: Int = 0
 )
+
+@Serializable
+data class GroupApplyRequestDto(
+    val id: String,
+    @SerialName("user_id")
+    val userId: String,
+    val username: String,
+    val nickname: String? = null,
+    @SerialName("avatar_url")
+    val avatarUrl: String? = null,
+    val reason: String = "",
+    @SerialName("created_at")
+    val createdAt: String = ""
+)

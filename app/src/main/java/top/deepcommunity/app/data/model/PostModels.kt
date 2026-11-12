@@ -41,6 +41,8 @@ data class PostItemDto(
     val tags: List<String> = emptyList(),
     @SerialName("category_id")
     val categoryId: Int? = null,
+    @SerialName("author_id")
+    val authorId: Long? = null,
     val author: PostAuthorDto? = null,
     @SerialName("author_username")
     val authorUsername: String? = null,
@@ -71,6 +73,9 @@ data class PostItemDto(
         get() = authorAvatar?.takeIf { it.isNotBlank() }
             ?: authorAvatarUrl?.takeIf { it.isNotBlank() }
             ?: author?.avatarUrl
+
+    val effectiveAuthorId: Long?
+        get() = authorId ?: author?.id?.toLongOrNull()
 }
 
 @Serializable
@@ -204,6 +209,12 @@ data class CommentDto(
     val likeCount: Int = 0,
     @SerialName("is_liked")
     val isLiked: Boolean = false,
+    @SerialName("author_id")
+    val authorId: Long? = null,
+    @SerialName("is_accepted")
+    val isAccepted: Boolean = false,
+    @SerialName("is_featured")
+    val isFeatured: Boolean = false,
     val replies: List<CommentDto> = emptyList(),
     @SerialName("created_at")
     val createdAt: String = ""
@@ -214,6 +225,9 @@ data class CommentDto(
 
     val displayAuthorAvatar: String?
         get() = if (isAnonymous) null else (authorAvatar ?: author?.avatarUrl)
+
+    val effectiveAuthorId: Long?
+        get() = authorId ?: author?.id?.toLongOrNull()
 }
 
 @Serializable
@@ -296,4 +310,37 @@ data class SystemAnnouncementDto(
     val title: String? = null,
     @SerialName("created_at")
     val createdAt: String? = null
+)
+
+@Serializable
+data class CreateReportRequest(
+    @SerialName("target_type")
+    val targetType: String,
+    @SerialName("target_id")
+    val targetId: String,
+    @SerialName("reason_type")
+    val reasonType: String = "spam",
+    val detail: String = ""
+)
+
+@Serializable
+data class LeaderboardItemDto(
+    val rank: Int = 1,
+    @SerialName("user_id")
+    val userId: String = "",
+    val username: String = "",
+    val nickname: String? = null,
+    @SerialName("avatar_url")
+    val avatarUrl: String? = null,
+    val level: Int = 1,
+    val title: String = "",
+    @SerialName("metric_label")
+    val metricLabel: String = ""
+)
+
+@Serializable
+data class LeaderboardsResponse(
+    val total: List<LeaderboardItemDto> = emptyList(),
+    val early: List<LeaderboardItemDto> = emptyList(),
+    val active: List<LeaderboardItemDto> = emptyList()
 )

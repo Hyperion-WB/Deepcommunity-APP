@@ -61,6 +61,8 @@ class ProfileViewModel @Inject constructor(
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
+    val userRepo: UserRepository get() = userRepository
+
     private val prefs = context.getSharedPreferences("deep_checkin_prefs", Context.MODE_PRIVATE)
 
     private val _uiState = MutableStateFlow(

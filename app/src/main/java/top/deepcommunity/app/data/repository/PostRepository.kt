@@ -12,8 +12,10 @@ import top.deepcommunity.app.data.model.CollectResponse
 import top.deepcommunity.app.data.model.CommentDto
 import top.deepcommunity.app.data.model.CreateCommentRequest
 import top.deepcommunity.app.data.model.CreatePostRequest
+import top.deepcommunity.app.data.model.CreateReportRequest
 import top.deepcommunity.app.data.model.DraftItemDto
 import top.deepcommunity.app.data.model.ErrorResponse
+import top.deepcommunity.app.data.model.LeaderboardsResponse
 import top.deepcommunity.app.data.model.LikeResponse
 import top.deepcommunity.app.data.model.NotificationDto
 import top.deepcommunity.app.data.model.PollCreateRequest
@@ -392,6 +394,81 @@ class PostRepository @Inject constructor(
             }
         } catch (e: Exception) {
             emit(Resource.Error(e.localizedMessage ?: "加载公告失败"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    // 关注作者动态流
+    fun getFollowingFeed(page: Int = 1, size: Int = 20): Flow<Resource<List<PostItemDto>>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = postApi.getFollowingFeed(page, size)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("加载关注动态失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    // 采纳最佳答案
+    fun acceptComment(commentId: String): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = postApi.acceptComment(commentId)
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.message ?: "已采纳为最佳答案"))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string())))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "操作失败"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    // 精选置顶评论
+    fun featureComment(commentId: String): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = postApi.featureComment(commentId)
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.message ?: "已精选置顶评论"))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string())))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "操作失败"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    // 举报
+    fun createReport(targetType: String, targetId: String, reasonType: String, detail: String): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = postApi.createReport(CreateReportRequest(targetType, targetId, reasonType, detail))
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.message ?: "举报已提交审核"))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string())))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "提交举报失败"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    // 全站榜单
+    fun getLeaderboards(): Flow<Resource<LeaderboardsResponse>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = postApi.getLeaderboards()
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("加载榜单失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
         }
     }.flowOn(Dispatchers.IO)
 

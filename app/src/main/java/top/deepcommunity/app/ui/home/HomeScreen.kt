@@ -67,6 +67,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.input.ImeAction
 import top.deepcommunity.app.core.designsystem.component.ImageViewerDialog
+import top.deepcommunity.app.ui.profile.UserProfileBottomSheet
+import top.deepcommunity.app.ui.home.LeaderboardsBottomSheet
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -111,6 +113,8 @@ fun HomeScreen(
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
     var previewImageUrl by remember { mutableStateOf<String?>(null) }
+    var showLeaderboards by remember { mutableStateOf(false) }
+    var selectedAuthorId by remember { mutableStateOf<Long?>(null) }
 
     // 监听外部刷新触发（如底栏主页按钮点击）
     LaunchedEffect(refreshTrigger) {
@@ -175,6 +179,53 @@ fun HomeScreen(
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onBackground
                         )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        // “推荐 / 关注” 专属动态流双 Tab
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(DeepTheme.extended.surfaceElevated)
+                                .border(0.8.dp, DeepTheme.extended.border, RoundedCornerShape(12.dp))
+                                .padding(2.dp)
+                        ) {
+                            val isRecommend = uiState.feedType == "recommend"
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isRecommend) MaterialTheme.colorScheme.primary else Color.Transparent)
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        viewModel.selectFeedType("recommend")
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "推荐",
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isRecommend) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isRecommend) MaterialTheme.colorScheme.onPrimary else DeepTheme.extended.textTertiary
+                                )
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (!isRecommend) MaterialTheme.colorScheme.primary else Color.Transparent)
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        viewModel.selectFeedType("following")
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "关注",
+                                    fontSize = 11.sp,
+                                    fontWeight = if (!isRecommend) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (!isRecommend) MaterialTheme.colorScheme.onPrimary else DeepTheme.extended.textTertiary
+                                )
+                            }
+                        }
                         if (uiState.isLoading) {
                             Spacer(modifier = Modifier.width(6.dp))
                             CircularProgressIndicator(
@@ -193,6 +244,29 @@ fun HomeScreen(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // 🏆 榜单与打卡热力图轻量胶囊入口（帖子为重，抽屉唤起）
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                        .border(1.dp, DeepTheme.extended.border, RoundedCornerShape(14.dp))
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            showLeaderboards = true
+                        }
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "🏆 榜单",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
+
                 // ⚡ 一键打卡极客组件（未打卡高亮，已打卡显示翡翠绿“已打卡”，防止重复困惑）
                 val checkinGreen = Color(0xFF10B981)
                 Box(
@@ -434,7 +508,8 @@ fun HomeScreen(
                         post = post,
                         onClick = { onPostClick(post.id) },
                         onLikeClick = { viewModel.toggleLike(post.id) },
-                        onImageClick = { previewImageUrl = it }
+                        onImageClick = { previewImageUrl = it },
+                        onAuthorClick = { authorId -> selectedAuthorId = authorId }
                     )
                 }
 
@@ -477,6 +552,28 @@ fun HomeScreen(
             imageUrl = previewImageUrl,
             onDismissRequest = { previewImageUrl = null }
         )
+
+        // 🏆 全站排行榜与打卡绿格子热力图半屏抽屉（帖子为重，抽屉唤起）
+        if (showLeaderboards) {
+            LeaderboardsBottomSheet(
+                postRepository = viewModel.postRepo,
+                userRepository = viewModel.userRepo,
+                onDismissRequest = { showLeaderboards = false },
+                onUserClick = { uId ->
+                    showLeaderboards = false
+                    selectedAuthorId = uId
+                }
+            )
+        }
+
+        // 👤 他人个人主页半屏弹窗
+        selectedAuthorId?.let { authorId ->
+            UserProfileBottomSheet(
+                userId = authorId,
+                userRepository = viewModel.userRepo,
+                onDismissRequest = { selectedAuthorId = null }
+            )
+        }
     }
 }
 
@@ -631,6 +728,7 @@ fun PostCard(
     onClick: () -> Unit,
     onLikeClick: () -> Unit,
     onImageClick: (String) -> Unit = {},
+    onAuthorClick: ((Long) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -683,7 +781,11 @@ fun PostCard(
             // 作者信息行
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = onAuthorClick != null && post.effectiveAuthorId != null) {
+                        post.effectiveAuthorId?.let { onAuthorClick?.invoke(it) }
+                    }
             ) {
                 val authorName = post.authorNickname ?: post.authorUsername ?: post.author?.nickname ?: "居民"
                 UserAvatar(

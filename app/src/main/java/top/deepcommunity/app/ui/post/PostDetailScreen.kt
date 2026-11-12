@@ -53,6 +53,12 @@ import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Share
 import top.deepcommunity.app.ui.post.component.PostSharePosterDialog
+import top.deepcommunity.app.ui.post.component.ReportDialog
+import top.deepcommunity.app.ui.profile.UserProfileBottomSheet
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -108,6 +114,9 @@ fun PostDetailScreen(
     val haptic = LocalHapticFeedback.current
     var previewImageUrl by remember { mutableStateOf<String?>(null) }
     var showSharePosterDialog by remember { mutableStateOf(false) }
+    var showReportPostDialog by remember { mutableStateOf(false) }
+    var reportCommentTarget by remember { mutableStateOf<Pair<Long, String>?>(null) } // id to content
+    var selectedUserId by remember { mutableStateOf<Long?>(null) }
 
     // 评论区相册选图上传
     val commentImagePickerLauncher = rememberLauncherForActivityResult(
@@ -169,6 +178,15 @@ fun PostDetailScreen(
                         Icon(
                             imageVector = Icons.Outlined.Share,
                             contentDescription = "生成极客海报分享",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+
+                    // 举报帖子
+                    IconButton(onClick = { showReportPostDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Outlined.Flag,
+                            contentDescription = "举报帖子",
                             tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
@@ -394,7 +412,9 @@ fun PostDetailScreen(
                                         .combinedClickable(
                                             interactionSource = postAvatarInteractionSource,
                                             indication = null,
-                                            onClick = {},
+                                            onClick = {
+                                                post.effectiveAuthorId?.let { selectedUserId = it }
+                                            },
                                             onLongClick = {
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                 viewModel.appendText("@$targetAuthorUsername ")
@@ -410,7 +430,14 @@ fun PostDetailScreen(
 
                                 Spacer(modifier = Modifier.width(12.dp))
 
-                                Column {
+                                Column(
+                                    modifier = Modifier.clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) {
+                                        post.effectiveAuthorId?.let { selectedUserId = it }
+                                    }
+                                ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(
                                             text = authorName,
@@ -611,7 +638,11 @@ fun PostDetailScreen(
                             onImageClick = { previewImageUrl = it },
                             onAvatarLongClick = { username ->
                                 viewModel.appendText("@$username ")
-                            }
+                            },
+                            onUserClick = { uId -> selectedUserId = uId },
+                            onAcceptClick = { cId -> viewModel.acceptComment(cId) },
+                            onFeatureClick = { cId -> viewModel.featureComment(cId) },
+                            onReportClick = { cId, cText -> reportCommentTarget = cId to cText }
                         )
                     }
                 }
@@ -631,6 +662,39 @@ fun PostDetailScreen(
                 onDismissRequest = { showSharePosterDialog = false }
             )
         }
+
+        // 举报帖子弹窗
+        if (showReportPostDialog) {
+            uiState.post?.let { p ->
+                ReportDialog(
+                    targetType = "POST",
+                    targetId = p.id.toLongOrNull() ?: 0L,
+                    targetTitle = p.title,
+                    postRepository = viewModel.postRepo,
+                    onDismissRequest = { showReportPostDialog = false }
+                )
+            }
+        }
+
+        // 举报评论弹窗
+        reportCommentTarget?.let { (cId, cText) ->
+            ReportDialog(
+                targetType = "COMMENT",
+                targetId = cId,
+                targetTitle = cText.take(30),
+                postRepository = viewModel.postRepo,
+                onDismissRequest = { reportCommentTarget = null }
+            )
+        }
+
+        // 他人个人主页
+        selectedUserId?.let { uId ->
+            UserProfileBottomSheet(
+                userId = uId,
+                userRepository = viewModel.userRepo,
+                onDismissRequest = { selectedUserId = null }
+            )
+        }
     }
 }
 
@@ -641,9 +705,14 @@ private fun CommentItem(
     onReplyClick: (String, String) -> Unit,
     onCommentLikeClick: (String) -> Unit,
     onImageClick: (String) -> Unit,
-    onAvatarLongClick: (String) -> Unit
+    onAvatarLongClick: (String) -> Unit,
+    onUserClick: (Long) -> Unit,
+    onAcceptClick: (Long) -> Unit,
+    onFeatureClick: (Long) -> Unit,
+    onReportClick: (Long, String) -> Unit
 ) {
     var isRepliesExpanded by remember { mutableStateOf(false) }
+    var isMenuExpanded by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     val authorName = comment.displayAuthorName
     val targetUsername = comment.authorUsername?.takeIf { it.isNotBlank() } ?: authorName
@@ -665,7 +734,7 @@ private fun CommentItem(
                 label = "comment_avatar_press"
             )
 
-            // 圆形头像长按快捷 @，彻底去除方形水波纹蒙版
+            // 圆形头像点击唤起他人主页，长按快捷 @
             Box(
                 modifier = Modifier
                     .scale(avatarScale)
@@ -673,7 +742,9 @@ private fun CommentItem(
                     .combinedClickable(
                         interactionSource = avatarInteractionSource,
                         indication = null,
-                        onClick = {},
+                        onClick = {
+                            comment.effectiveAuthorId?.let(onUserClick)
+                        },
                         onLongClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             onAvatarLongClick(targetUsername)
@@ -690,12 +761,46 @@ private fun CommentItem(
             Spacer(modifier = Modifier.width(10.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = authorName,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = authorName,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    if (comment.isAccepted) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0xFFFFB300).copy(alpha = 0.15f))
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                        ) {
+                            Text(
+                                text = "👑 最佳采纳",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFF8F00)
+                            )
+                        }
+                    }
+                    if (comment.isFeatured) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0xFF8E24AA).copy(alpha = 0.12f))
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                        ) {
+                            Text(
+                                text = "📌 作者置顶",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF8E24AA)
+                            )
+                        }
+                    }
+                }
                 Text(
                     text = comment.createdAt.take(16).replace("T", " "),
                     fontSize = 10.sp,
@@ -734,7 +839,7 @@ private fun CommentItem(
 
             Spacer(modifier = Modifier.width(4.dp))
 
-            // 回复按钮：去除方块灰色蒙版，传递真正用户名
+            // 回复按钮
             Text(
                 text = "回复",
                 fontSize = 11.sp,
@@ -746,8 +851,51 @@ private fun CommentItem(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
                     ) { onReplyClick(comment.id, targetUsername) }
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .padding(horizontal = 6.dp, vertical = 4.dp)
             )
+
+            // 更多操作下拉菜单（采纳/置顶/举报）
+            Box {
+                IconButton(
+                    onClick = { isMenuExpanded = true },
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.MoreVert,
+                        contentDescription = "操作",
+                        tint = DeepTheme.extended.textTertiary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = isMenuExpanded,
+                    onDismissRequest = { isMenuExpanded = false }
+                ) {
+                    val cIdLong = comment.id.toLongOrNull() ?: 0L
+                    DropdownMenuItem(
+                        text = { Text("👑 采纳为最佳答案", fontSize = 12.sp) },
+                        onClick = {
+                            isMenuExpanded = false
+                            onAcceptClick(cIdLong)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("📌 精选置顶该评论", fontSize = 12.sp) },
+                        onClick = {
+                            isMenuExpanded = false
+                            onFeatureClick(cIdLong)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("🚩 举报违规评论", fontSize = 12.sp) },
+                        onClick = {
+                            isMenuExpanded = false
+                            onReportClick(cIdLong, comment.content)
+                        }
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(6.dp))

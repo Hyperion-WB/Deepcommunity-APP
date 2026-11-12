@@ -12,6 +12,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.ui.draw.scale
@@ -36,6 +38,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material.icons.outlined.Settings
+import top.deepcommunity.app.ui.profile.FollowListBottomSheet
+import top.deepcommunity.app.ui.profile.PrivacyDndBottomSheet
+import top.deepcommunity.app.ui.profile.UserProfileBottomSheet
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.BasicAlertDialog
@@ -88,6 +95,9 @@ fun ProfileScreen(
     val coroutineScope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
     val pagerState = rememberPagerState(initialPage = uiState.selectedTab) { 2 }
+    var followListTab by remember { mutableStateOf<Int?>(null) }
+    var showPrivacyDndSheet by remember { mutableStateOf(false) }
+    var selectedOtherUserId by remember { mutableStateOf<Long?>(null) }
 
     // 左右滑动手势联动选中的 Tab
     LaunchedEffect(pagerState.currentPage) {
@@ -271,6 +281,94 @@ fun ProfileScreen(
                             lineHeight = 18.sp
                         )
 
+                        // 关注、粉丝与隐私设置数据统计栏
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(DeepTheme.extended.surfaceElevated.copy(alpha = 0.5f))
+                                .border(0.8.dp, DeepTheme.extended.border, RoundedCornerShape(12.dp))
+                                .padding(vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { followListTab = 0 }
+                                    .padding(horizontal = 14.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "${user?.followingCount ?: 0}",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "关注",
+                                    fontSize = 11.sp,
+                                    color = DeepTheme.extended.textSecondary
+                                )
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .size(width = 1.dp, height = 22.dp)
+                                    .background(DeepTheme.extended.border)
+                            )
+
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { followListTab = 1 }
+                                    .padding(horizontal = 14.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "${user?.followersCount ?: 0}",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "粉丝",
+                                    fontSize = 11.sp,
+                                    color = DeepTheme.extended.textSecondary
+                                )
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .size(width = 1.dp, height = 22.dp)
+                                    .background(DeepTheme.extended.border)
+                            )
+
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { showPrivacyDndSheet = true }
+                                    .padding(horizontal = 14.dp, vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Security,
+                                    contentDescription = "隐私设置",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(17.dp)
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "隐私与免打扰",
+                                    fontSize = 11.sp,
+                                    color = DeepTheme.extended.textSecondary
+                                )
+                            }
+                        }
+
                         // 连续打卡与补签战绩横条
                         val checkin = uiState.checkinStatus
                         if (checkin != null) {
@@ -327,10 +425,13 @@ fun ProfileScreen(
                                     color = DeepTheme.extended.textSecondary
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
-                                LazyRow(
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    items(uiState.achievements, key = { it.code }) { ach ->
+                                    uiState.achievements.forEach { ach ->
                                         Row(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(10.dp))
@@ -514,6 +615,38 @@ fun ProfileScreen(
                 isUpdating = uiState.isUpdatingProfile,
                 onDismiss = { viewModel.setShowEditDialog(false) },
                 onConfirm = { nick, bio -> viewModel.updateProfile(nick, bio) }
+            )
+        }
+
+        // 关注与粉丝列表抽屉
+        followListTab?.let { tabIndex ->
+            val myIdLong = uiState.user?.id?.toLongOrNull() ?: 0L
+            FollowListBottomSheet(
+                userId = myIdLong,
+                initialTab = tabIndex,
+                userRepository = viewModel.userRepo,
+                onDismissRequest = { followListTab = null },
+                onUserClick = { uId ->
+                    followListTab = null
+                    selectedOtherUserId = uId
+                }
+            )
+        }
+
+        // 隐私与夜间免打扰抽屉
+        if (showPrivacyDndSheet) {
+            PrivacyDndBottomSheet(
+                userRepository = viewModel.userRepo,
+                onDismissRequest = { showPrivacyDndSheet = false }
+            )
+        }
+
+        // 他人个人主页弹窗
+        selectedOtherUserId?.let { otherId ->
+            UserProfileBottomSheet(
+                userId = otherId,
+                userRepository = viewModel.userRepo,
+                onDismissRequest = { selectedOtherUserId = null }
             )
         }
     }

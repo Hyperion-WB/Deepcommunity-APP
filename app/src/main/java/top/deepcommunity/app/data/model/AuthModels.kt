@@ -79,3 +79,56 @@ data class AchievementDto(
     @SerialName("unlocked_at")
     val unlockedAt: String? = null
 )
+
+@Serializable
+data class FollowUserItemDto(
+    val id: String = "",
+    val username: String = "",
+    val nickname: String? = null,
+    @SerialName("avatar_url")
+    val avatarUrl: String? = null,
+    val level: Int = 1,
+    val bio: String? = null,
+    @SerialName("is_following")
+    val isFollowing: Boolean = false
+)
+
+@Serializable
+data class PublicUserProfileDto(
+    val id: String = "",
+    val username: String = "",
+    val nickname: String? = null,
+    @SerialName("avatar_url")
+    val avatarUrl: String? = null,
+    val bio: String? = null,
+    val level: Int = 1,
+    val exp: Int = 0,
+    @SerialName("followers_count")
+    val followersCount: Int = 0,
+    @SerialName("following_count")
+    val followingCount: Int = 0,
+    @SerialName("post_count")
+    val postCount: Int = 0,
+    @SerialName("is_following")
+    val isFollowing: Boolean = false,
+    @SerialName("created_at")
+    val createdAt: String? = null
+)
+
+@Serializable
+data class UpdatePrivacyRequest(
+    @SerialName("hide_posts")
+    val hidePosts: Boolean = false,
+    @SerialName("hide_collections")
+    val hideCollections: Boolean = false
+)
+
+@Serializable
+data class UpdateDndRequest(
+    @SerialName("dnd_enabled")
+    val dndEnabled: Boolean = false,
+    @SerialName("dnd_start")
+    val dndStart: String = "23:00",
+    @SerialName("dnd_end")
+    val dndEnd: String = "08:00"
+)

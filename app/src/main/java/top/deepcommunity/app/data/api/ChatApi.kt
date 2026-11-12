@@ -11,6 +11,7 @@ import retrofit2.http.PUT
 import top.deepcommunity.app.data.model.ChatMessageDto
 import top.deepcommunity.app.data.model.CollectStickerRequest
 import top.deepcommunity.app.data.model.ConversationDto
+import top.deepcommunity.app.data.model.GroupApplyRequestDto
 import top.deepcommunity.app.data.model.GroupCheckinStatusDto
 import top.deepcommunity.app.data.model.GroupMemberDto
 import top.deepcommunity.app.data.model.GroupRoomDto
@@ -133,4 +134,23 @@ interface ChatApi {
 
     @POST("api/stickers/collect")
     suspend fun collectSticker(@Body request: CollectStickerRequest): Response<MessageResponse>
+
+    @DELETE("api/stickers/{sticker_id}")
+    suspend fun deleteSticker(@Path("sticker_id") stickerId: String): Response<MessageResponse>
+
+    // 入群审批
+    @GET("api/chat/groups/{room_id}/requests")
+    suspend fun getGroupRequests(@Path("room_id") roomId: String): Response<List<GroupApplyRequestDto>>
+
+    @POST("api/chat/groups/{room_id}/requests/{request_id}/approve")
+    suspend fun approveGroupRequest(
+        @Path("room_id") roomId: String,
+        @Path("request_id") requestId: String
+    ): Response<MessageResponse>
+
+    @POST("api/chat/groups/{room_id}/requests/{request_id}/reject")
+    suspend fun rejectGroupRequest(
+        @Path("room_id") roomId: String,
+        @Path("request_id") requestId: String
+    ): Response<MessageResponse>
 }

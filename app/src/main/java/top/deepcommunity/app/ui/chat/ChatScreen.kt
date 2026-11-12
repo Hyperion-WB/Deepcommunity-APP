@@ -117,9 +117,12 @@ import top.deepcommunity.app.core.designsystem.component.ImageViewerDialog
 import top.deepcommunity.app.core.designsystem.component.UserAvatar
 import top.deepcommunity.app.core.designsystem.theme.AccentLike
 import top.deepcommunity.app.core.designsystem.theme.DeepTheme
+import top.deepcommunity.app.data.model.ChatMessageDto
 import top.deepcommunity.app.data.model.GroupCheckinStatusDto
 import top.deepcommunity.app.data.model.GroupMemberDto
 import top.deepcommunity.app.data.model.StickerItemDto
+import top.deepcommunity.app.ui.chat.GroupRequestsBottomSheet
+import top.deepcommunity.app.ui.profile.UserProfileBottomSheet
 
 // 预设高频常用 Emoji
 private val DEFAULT_EMOJIS = listOf(
@@ -148,6 +151,8 @@ fun ChatScreen(
     var showBlockConfirmDialog by remember { mutableStateOf(false) }
     var highlightedMsgId by remember { mutableStateOf<String?>(null) }
     var previewChatImageUrl by remember { mutableStateOf<String?>(null) }
+    var showGroupRequestsSheet by remember { mutableStateOf(false) }
+    var selectedChatUserId by remember { mutableStateOf<Long?>(null) }
 
     // 相册选图发送
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -432,7 +437,8 @@ fun ChatScreen(
                         onEmojiClick = { emoji -> viewModel.appendText(emoji) },
                         stickers = uiState.stickers,
                         isLoadingStickers = uiState.isLoadingStickers,
-                        onStickerClick = viewModel::sendSticker
+                        onStickerClick = viewModel::sendSticker,
+                        onStickerDelete = viewModel::deleteSticker
                     )
                 }
             }
@@ -484,7 +490,8 @@ fun ChatScreen(
                         scope.launch { snackbarHostState.showSnackbar("已复制到剪贴板") }
                     },
                     onImageClick = { previewChatImageUrl = it },
-                    onCollectSticker = viewModel::collectSticker
+                    onCollectSticker = viewModel::collectSticker,
+                    onUserClick = { uId -> selectedChatUserId = uId }
                 )
             }
         }
@@ -513,6 +520,7 @@ fun ChatScreen(
                     onUpdateRole = viewModel::updateMemberRole,
                     onMuteMember = viewModel::muteMember,
                     onUnmuteMember = viewModel::unmuteMember,
+                    onOpenRequests = { showGroupRequestsSheet = true },
                     onLeaveGroup = {
                         viewModel.toggleGroupInfoSheet(false)
                         viewModel.leaveCurrentGroup(onBackClick)
@@ -550,9 +558,29 @@ fun ChatScreen(
             imageUrl = previewChatImageUrl,
             onDismissRequest = { previewChatImageUrl = null }
         )
+
+        // 入群审批中心抽屉
+        if (showGroupRequestsSheet) {
+            val gIdLong = viewModel.convId.toLongOrNull() ?: 0L
+            GroupRequestsBottomSheet(
+                groupId = gIdLong,
+                chatRepository = viewModel.chatRepo,
+                onDismissRequest = { showGroupRequestsSheet = false }
+            )
+        }
+
+        // 他人个人主页弹窗
+        selectedChatUserId?.let { uId ->
+            UserProfileBottomSheet(
+                userId = uId,
+                userRepository = viewModel.userRepo,
+                onDismissRequest = { selectedChatUserId = null }
+            )
+        }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun EnhancedStickerDrawer(
     selectedTab: Int,
@@ -560,8 +588,35 @@ private fun EnhancedStickerDrawer(
     onEmojiClick: (String) -> Unit,
     stickers: List<StickerItemDto>,
     isLoadingStickers: Boolean,
-    onStickerClick: (StickerItemDto) -> Unit
+    onStickerClick: (StickerItemDto) -> Unit,
+    onStickerDelete: ((Long) -> Unit)? = null
 ) {
+    val haptic = LocalHapticFeedback.current
+    var stickerToDelete by remember { mutableStateOf<StickerItemDto?>(null) }
+
+    if (stickerToDelete != null) {
+        val target = stickerToDelete!!
+        AlertDialog(
+            onDismissRequest = { stickerToDelete = null },
+            title = { Text("移除表情包", fontSize = 15.sp) },
+            text = { Text("确定要将该表情包从「我的表情」中移除吗？", fontSize = 13.sp) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        stickerToDelete = null
+                        onStickerDelete?.invoke(target.id)
+                    }
+                ) {
+                    Text("确定移除", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { stickerToDelete = null }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -651,7 +706,13 @@ private fun EnhancedStickerDrawer(
                                 .aspectRatio(1f)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(MaterialTheme.colorScheme.surface)
-                                .clickable { onStickerClick(sticker) }
+                                .combinedClickable(
+                                    onClick = { onStickerClick(sticker) },
+                                    onLongClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        stickerToDelete = sticker
+                                    }
+                                )
                                 .padding(4.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -682,7 +743,8 @@ private fun ChatMessageBubble(
     onRecallClick: () -> Unit,
     onCopyClick: () -> Unit,
     onImageClick: (String) -> Unit = {},
-    onCollectSticker: (String) -> Unit = {}
+    onCollectSticker: (String) -> Unit = {},
+    onUserClick: (Long) -> Unit = {}
 ) {
     // 若消息已撤回
     if (message.isRecalled) {
@@ -743,7 +805,9 @@ private fun ChatMessageBubble(
                     .combinedClickable(
                         interactionSource = avatarInteractionSource,
                         indication = null,
-                        onClick = {},
+                        onClick = {
+                            message.senderId.toLongOrNull()?.let(onUserClick)
+                        },
                         onLongClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             onAvatarLongClick()
@@ -1100,6 +1164,7 @@ private fun GroupInfoSheetContent(
     onUpdateRole: (String, String) -> Unit,
     onMuteMember: (String, Int) -> Unit = { _, _ -> },
     onUnmuteMember: (String) -> Unit = {},
+    onOpenRequests: () -> Unit = {},
     onLeaveGroup: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
@@ -1182,6 +1247,38 @@ private fun GroupInfoSheetContent(
                 fontSize = 12.sp,
                 color = DeepTheme.extended.textSecondary
             )
+        }
+
+        // 管理员入群审批中心入口
+        if (myRole == "owner" || myRole == "admin") {
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(DeepTheme.extended.surfaceElevated)
+                    .border(0.8.dp, DeepTheme.extended.border, RoundedCornerShape(12.dp))
+                    .clickable { onOpenRequests() }
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = "📋", fontSize = 16.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "入群申请审批中心",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Text(
+                    text = "查看待审批 ➔",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
