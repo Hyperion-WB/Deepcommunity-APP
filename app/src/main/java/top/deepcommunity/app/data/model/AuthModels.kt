@@ -52,3 +52,30 @@ data class ErrorResponse(
 data class MessageResponse(
     val message: String
 )
+
+@Serializable
+data class CheckinStatusDetailDto(
+    @SerialName("checked_today")
+    val checkedToday: Boolean = false,
+    val streak: Int = 0,
+    @SerialName("best_streak")
+    val bestStreak: Int = 0,
+    @SerialName("makeup_earned")
+    val makeupEarned: Int = 0,
+    @SerialName("makeup_used")
+    val makeupUsed: Int = 0,
+    @SerialName("makeup_left")
+    val makeupLeft: Int = 0
+)
+
+@Serializable
+data class AchievementDto(
+    val code: String,
+    val name: String,
+    val subtitle: String? = null,
+    val description: String? = null,
+    val icon: String = "🏅",
+    val rarity: String = "common",
+    @SerialName("unlocked_at")
+    val unlockedAt: String? = null
+)

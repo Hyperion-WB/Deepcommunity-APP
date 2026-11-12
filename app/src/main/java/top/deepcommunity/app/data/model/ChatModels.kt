@@ -248,3 +248,28 @@ data class BlockActionResponse(
     @SerialName("is_blocked")
     val isBlocked: Boolean = false
 )
+
+@Serializable
+data class CollectStickerRequest(
+    val url: String
+)
+
+@Serializable
+data class MuteMemberRequest(
+    @SerialName("duration_minutes")
+    val durationMinutes: Int = 60
+)
+
+@Serializable
+data class GroupCheckinStatusDto(
+    @SerialName("is_checked_in")
+    val isCheckedIn: Boolean = false,
+    @SerialName("checkin_count")
+    val checkinCount: Int = 0,
+    @SerialName("checkin_word")
+    val checkinWord: String = "打卡",
+    @SerialName("group_level")
+    val groupLevel: Int = 1,
+    @SerialName("group_exp")
+    val groupExp: Int = 0
+)

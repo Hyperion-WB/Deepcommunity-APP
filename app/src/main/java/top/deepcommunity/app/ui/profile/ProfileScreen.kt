@@ -270,6 +270,83 @@ fun ProfileScreen(
                             color = DeepTheme.extended.textSecondary,
                             lineHeight = 18.sp
                         )
+
+                        // 连续打卡与补签战绩横条
+                        val checkin = uiState.checkinStatus
+                        if (checkin != null) {
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .border(0.8.dp, DeepTheme.extended.border, RoundedCornerShape(12.dp))
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(text = "⚡", fontSize = 16.sp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Column {
+                                        Text(
+                                            text = "连续打卡 ${checkin.streak} 天 (最高 ${checkin.bestStreak} 天)",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = "剩余补签机会: ${checkin.makeupLeft} 次",
+                                            fontSize = 10.sp,
+                                            color = DeepTheme.extended.textTertiary
+                                        )
+                                    }
+                                }
+                                if (checkin.makeupLeft > 0) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                                            .clickable { viewModel.makeupCheckin() }
+                                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                                    ) {
+                                        Text(text = "一键补签", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            }
+                        }
+
+                        // 我的成就勋章墙
+                        if (uiState.achievements.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Column {
+                                Text(
+                                    text = "成就勋章 (${uiState.achievements.size})",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = DeepTheme.extended.textSecondary
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    items(uiState.achievements, key = { it.code }) { ach ->
+                                        Row(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(MaterialTheme.colorScheme.surface)
+                                                .border(0.8.dp, DeepTheme.extended.border, RoundedCornerShape(10.dp))
+                                                .padding(horizontal = 8.dp, vertical = 5.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(text = ach.icon, fontSize = 14.sp)
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(text = ach.name, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

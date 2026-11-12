@@ -9,11 +9,14 @@ import top.deepcommunity.app.core.common.Resource
 import top.deepcommunity.app.core.network.WebSocketManager
 import top.deepcommunity.app.data.api.ChatApi
 import top.deepcommunity.app.data.model.ChatMessageDto
+import top.deepcommunity.app.data.model.CollectStickerRequest
 import top.deepcommunity.app.data.model.ConversationDto
 import top.deepcommunity.app.data.model.ErrorResponse
+import top.deepcommunity.app.data.model.GroupCheckinStatusDto
 import top.deepcommunity.app.data.model.GroupMemberDto
 import top.deepcommunity.app.data.model.GroupRoomDto
 import top.deepcommunity.app.data.model.KickMemberRequest
+import top.deepcommunity.app.data.model.MuteMemberRequest
 import top.deepcommunity.app.data.model.SendMessageRequest
 import top.deepcommunity.app.data.model.StickerListResponse
 import top.deepcommunity.app.data.model.UpdateGroupRoomRequest
@@ -269,6 +272,79 @@ class ChatRepository @Inject constructor(
                 emit(Resource.Success(response.body()!!))
             } else {
                 emit(Resource.Error("加载表情包失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun collectSticker(url: String): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.collectSticker(CollectStickerRequest(url))
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.message ?: "已收藏到「我的表情」"))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "收藏失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    // 群内摇骰子
+    fun rollDice(roomId: String): Flow<Resource<ChatMessageDto>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.rollDice(roomId)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "掷骰子失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    // 群签到状态
+    fun getGroupCheckinStatus(roomId: String): Flow<Resource<GroupCheckinStatusDto>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.getGroupCheckinStatus(roomId)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("获取签到状态失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    // 禁言与解禁
+    fun muteMember(roomId: String, targetUserId: String, durationMinutes: Int = 60): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.muteMember(roomId, targetUserId, MuteMemberRequest(durationMinutes))
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.message ?: "禁言成功"))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "操作失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun unmuteMember(roomId: String, targetUserId: String): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.unmuteMember(roomId, targetUserId)
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.message ?: "已解除禁言"))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "操作失败"))
             }
         } catch (e: Exception) {
             emit(Resource.Error(e.localizedMessage ?: "网络错误"))

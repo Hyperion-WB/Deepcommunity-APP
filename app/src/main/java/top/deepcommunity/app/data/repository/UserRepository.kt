@@ -7,7 +7,9 @@ import kotlinx.coroutines.flow.flowOn
 import okhttp3.MultipartBody
 import top.deepcommunity.app.core.common.Resource
 import top.deepcommunity.app.data.api.UserApi
+import top.deepcommunity.app.data.model.AchievementDto
 import top.deepcommunity.app.data.model.BlockedUserDto
+import top.deepcommunity.app.data.model.CheckinStatusDetailDto
 import top.deepcommunity.app.data.model.PostItemDto
 import top.deepcommunity.app.data.model.UserDto
 import javax.inject.Inject
@@ -124,6 +126,48 @@ class UserRepository @Inject constructor(
                 emit(Resource.Success(response.body()!!))
             } else {
                 emit(Resource.Error("获取黑名单失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun getCheckinStatus(): Flow<Resource<CheckinStatusDetailDto>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = userApi.getCheckinStatus()
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("获取签到数据失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun makeupCheckin(): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = userApi.makeupCheckin()
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.message ?: "补签成功！"))
+            } else {
+                emit(Resource.Error("补签失败或次数已用尽"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun getMyAchievements(): Flow<Resource<List<AchievementDto>>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = userApi.getMyAchievements()
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("获取勋章成就失败"))
             }
         } catch (e: Exception) {
             emit(Resource.Error(e.localizedMessage ?: "网络错误"))

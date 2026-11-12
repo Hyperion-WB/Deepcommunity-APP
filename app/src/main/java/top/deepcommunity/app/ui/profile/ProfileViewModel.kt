@@ -18,7 +18,9 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import top.deepcommunity.app.core.common.Resource
+import top.deepcommunity.app.data.model.AchievementDto
 import top.deepcommunity.app.data.model.BlockedUserDto
+import top.deepcommunity.app.data.model.CheckinStatusDetailDto
 import top.deepcommunity.app.data.model.PostItemDto
 import top.deepcommunity.app.data.model.UserDto
 import top.deepcommunity.app.data.repository.AuthRepository
@@ -42,7 +44,9 @@ data class ProfileUiState(
     val showEditDialog: Boolean = false,
     val showBlocksSheet: Boolean = false,
     val blockedUsers: List<BlockedUserDto> = emptyList(),
-    val isLoadingBlocks: Boolean = false
+    val isLoadingBlocks: Boolean = false,
+    val checkinStatus: CheckinStatusDetailDto? = null,
+    val achievements: List<AchievementDto> = emptyList()
 )
 
 sealed interface ProfileEvent {
@@ -73,6 +77,8 @@ class ProfileViewModel @Inject constructor(
     init {
         refreshProfile()
         loadTabContent(0)
+        loadCheckinStatus()
+        loadAchievements()
     }
 
     private fun getTodayDateStr(): String {
@@ -252,6 +258,41 @@ class ProfileViewModel @Inject constructor(
                     }
                     is Resource.Error -> _eventFlow.emit(ProfileEvent.ShowToast(result.message))
                     else -> {}
+                }
+            }
+        }
+    }
+
+    fun loadCheckinStatus() {
+        viewModelScope.launch {
+            userRepository.getCheckinStatus().collect { result ->
+                if (result is Resource.Success) {
+                    _uiState.update { it.copy(checkinStatus = result.data) }
+                }
+            }
+        }
+    }
+
+    fun makeupCheckin() {
+        viewModelScope.launch {
+            userRepository.makeupCheckin().collect { result ->
+                when (result) {
+                    is Resource.Success -> {
+                        _eventFlow.emit(ProfileEvent.ShowToast("✓ ${result.data}"))
+                        loadCheckinStatus()
+                    }
+                    is Resource.Error -> _eventFlow.emit(ProfileEvent.ShowToast(result.message))
+                    else -> {}
+                }
+            }
+        }
+    }
+
+    fun loadAchievements() {
+        viewModelScope.launch {
+            userRepository.getMyAchievements().collect { result ->
+                if (result is Resource.Success) {
+                    _uiState.update { it.copy(achievements = result.data) }
                 }
             }
         }

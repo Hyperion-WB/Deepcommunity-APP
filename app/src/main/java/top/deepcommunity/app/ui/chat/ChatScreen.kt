@@ -110,13 +110,14 @@ import androidx.compose.ui.window.PopupProperties
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import top.deepcommunity.app.core.common.ChatContentParser
 import top.deepcommunity.app.core.common.Constants
 import top.deepcommunity.app.core.designsystem.component.GlassBox
 import top.deepcommunity.app.core.designsystem.component.ImageViewerDialog
 import top.deepcommunity.app.core.designsystem.component.UserAvatar
 import top.deepcommunity.app.core.designsystem.theme.AccentLike
 import top.deepcommunity.app.core.designsystem.theme.DeepTheme
-import top.deepcommunity.app.data.model.ChatMessageDto
+import top.deepcommunity.app.data.model.GroupCheckinStatusDto
 import top.deepcommunity.app.data.model.GroupMemberDto
 import top.deepcommunity.app.data.model.StickerItemDto
 
@@ -246,7 +247,7 @@ fun ChatScreen(
                     .fillMaxWidth()
                     .imePadding()
             ) {
-                // 引用回复预览横条
+                // 引用回复预览横条（智能折叠图片路径，绝不裸露原始地址）
                 AnimatedVisibility(
                     visible = uiState.replyingToMessage != null,
                     enter = expandVertically() + fadeIn(),
@@ -254,6 +255,13 @@ fun ChatScreen(
                 ) {
                     val replyMsg = uiState.replyingToMessage
                     if (replyMsg != null) {
+                        val replySnippetText = remember(replyMsg) {
+                            ChatContentParser.formatReplySnippet(replyMsg.replySnippet, replyMsg.content)
+                        }
+                        val parsed = remember(replyMsg) {
+                            ChatContentParser.parse(replyMsg.content, replyMsg.msgType)
+                        }
+
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -274,8 +282,20 @@ fun ChatScreen(
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
+                                if (parsed.imageUrls.isNotEmpty()) {
+                                    val firstThumb = ChatContentParser.toFullImageUrl(parsed.imageUrls.first())
+                                    AsyncImage(
+                                        model = firstThumb,
+                                        contentDescription = null,
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(RoundedCornerShape(4.dp)),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                }
                                 Text(
-                                    text = "回复 @${replyMsg.displayName}: ${replyMsg.content.take(30)}",
+                                    text = "回复 @${replyMsg.displayName}: $replySnippetText",
                                     fontSize = 12.sp,
                                     color = DeepTheme.extended.textSecondary,
                                     maxLines = 1,
@@ -327,6 +347,23 @@ fun ChatScreen(
                                     tint = DeepTheme.extended.textSecondary,
                                     modifier = Modifier.size(22.dp)
                                 )
+                            }
+                        }
+
+                        // 摇骰子按钮（群聊专属互动）
+                        if (uiState.isGroupChat) {
+                            IconButton(
+                                onClick = {
+                                    viewModel.rollDice()
+                                },
+                                enabled = !uiState.isRollingDice,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                if (uiState.isRollingDice) {
+                                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                                } else {
+                                    Text(text = "🎲", fontSize = 18.sp)
+                                }
                             }
                         }
 
@@ -446,7 +483,8 @@ fun ChatScreen(
                         clipboard.setPrimaryClip(ClipData.newPlainText("chat_msg", msg.content))
                         scope.launch { snackbarHostState.showSnackbar("已复制到剪贴板") }
                     },
-                    onImageClick = { previewChatImageUrl = it }
+                    onImageClick = { previewChatImageUrl = it },
+                    onCollectSticker = viewModel::collectSticker
                 )
             }
         }
@@ -465,6 +503,7 @@ fun ChatScreen(
                     isLoading = uiState.isLoadingGroupMembers,
                     myRole = uiState.myRole,
                     currentUserId = uiState.currentUserId,
+                    groupCheckinStatus = uiState.groupCheckinStatus,
                     onMemberClick = { member ->
                         val atUsername = member.username.takeIf { it.isNotBlank() } ?: member.displayName
                         viewModel.appendText("@$atUsername ")
@@ -472,6 +511,8 @@ fun ChatScreen(
                     },
                     onKickMember = viewModel::kickMember,
                     onUpdateRole = viewModel::updateMemberRole,
+                    onMuteMember = viewModel::muteMember,
+                    onUnmuteMember = viewModel::unmuteMember,
                     onLeaveGroup = {
                         viewModel.toggleGroupInfoSheet(false)
                         viewModel.leaveCurrentGroup(onBackClick)
@@ -640,7 +681,8 @@ private fun ChatMessageBubble(
     onReplyClick: () -> Unit,
     onRecallClick: () -> Unit,
     onCopyClick: () -> Unit,
-    onImageClick: (String) -> Unit = {}
+    onImageClick: (String) -> Unit = {},
+    onCollectSticker: (String) -> Unit = {}
 ) {
     // 若消息已撤回
     if (message.isRecalled) {
@@ -662,12 +704,10 @@ private fun ChatMessageBubble(
     var showMenu by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
-    val isImage = message.msgType == "image" || message.msgType == "sticker" || run {
-        val trimmed = message.content.trim().lowercase()
-        val isImgExt = trimmed.endsWith(".jpg") || trimmed.endsWith(".jpeg") ||
-                trimmed.endsWith(".png") || trimmed.endsWith(".webp") ||
-                trimmed.endsWith(".gif") || trimmed.endsWith(".bmp")
-        isImgExt && (trimmed.startsWith("/uploads/") || trimmed.startsWith("http://") || trimmed.startsWith("https://"))
+
+    // 使用智能解析器分离文本、图片列表、骰子、签到
+    val parsed = remember(message.content, message.msgType) {
+        ChatContentParser.parse(message.content, message.msgType)
     }
 
     // 高亮定位动画
@@ -685,7 +725,7 @@ private fun ChatMessageBubble(
         horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.Top
     ) {
-        // 群聊中非自己发送的消息，展示头像与昵称（长按头像可快捷 @，丝滑物理微缩放 + 触感震动，去除原生方块水波纹）
+        // 群聊中非自己发送的消息，展示头像与昵称
         if (!isMe && isGroup) {
             val avatarInteractionSource = remember { MutableInteractionSource() }
             val isAvatarPressed by avatarInteractionSource.collectIsPressedAsState()
@@ -748,7 +788,7 @@ private fun ChatMessageBubble(
                 }
             }
 
-            // 气泡本体 + 长按弹出高质感液态操作条（无方形水波纹，物理触感反馈）
+            // 气泡本体 + 长按弹出操作条
             Box {
                 val bubbleInteractionSource = remember { MutableInteractionSource() }
                 Column(
@@ -776,8 +816,11 @@ private fun ChatMessageBubble(
                         )
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
-                    // 若有被引用的回复快照（点击平滑定位跳转）
-                    if (message.replySnippet.isNotBlank() || message.replySender.isNotBlank()) {
+                    // 若有被引用的回复快照（智能折叠图片，绝不暴露裸露地址）
+                    val replySnippetFormatted = remember(message.replySnippet) {
+                        ChatContentParser.formatReplySnippet(message.replySnippet)
+                    }
+                    if (replySnippetFormatted.isNotBlank() || message.replySender.isNotBlank()) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -789,7 +832,7 @@ private fun ChatMessageBubble(
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Text(
-                                text = "“${message.replySender}: ${message.replySnippet}”",
+                                text = "“${message.replySender}: $replySnippetFormatted”",
                                 fontSize = 11.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -799,90 +842,142 @@ private fun ChatMessageBubble(
                         Spacer(modifier = Modifier.height(4.dp))
                     }
 
-                    if (isImage) {
-                        val fullUrl = if (!message.content.startsWith("http")) {
-                            Constants.BASE_URL.trimEnd('/') + "/" + message.content.trimStart('/')
-                        } else {
-                            message.content
+                    // 1. 摇骰子结果卡片
+                    if (parsed.isDice) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(vertical = 4.dp, horizontal = 2.dp)
+                        ) {
+                            Text(text = "🎲", fontSize = 28.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "掷出了 ${parsed.dicePoints} 点",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "服务端生成 · 真实防作弊",
+                                    fontSize = 9.sp,
+                                    color = if (isMe) Color.White.copy(alpha = 0.7f) else DeepTheme.extended.textTertiary
+                                )
+                            }
                         }
-                        AsyncImage(
-                            model = fullUrl,
-                            contentDescription = "图片消息",
-                            modifier = Modifier
-                                .widthIn(max = 200.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { onImageClick(fullUrl) },
-                            contentScale = ContentScale.Fit
-                        )
+                    } else if (parsed.isCheckin) {
+                        // 2. 每日群签到卡片
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(vertical = 4.dp, horizontal = 2.dp)
+                        ) {
+                            Text(text = "✅", fontSize = 20.sp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Column {
+                                Text(
+                                    text = "每日签到 · ${parsed.pureText}",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "群等级经验已到账",
+                                    fontSize = 9.sp,
+                                    color = if (isMe) Color.White.copy(alpha = 0.7f) else DeepTheme.extended.textTertiary
+                                )
+                            }
+                        }
                     } else {
-                        // 智能识别文本中的 URL 链接并高亮，支持一键点击在系统浏览器中打开
-                        val content = message.content
-                        val urlPattern = remember { Pattern.compile("https?://[\\w-]+(\\.[\\w-]+)+(/[\\w-./?%&=#@:;+~]*)?") }
-                        val hasUrl = remember(content) { urlPattern.matcher(content).find() }
-                        val linkColor = if (isMe) Color.White else MaterialTheme.colorScheme.primary
+                        // 3. 正常图文混排或纯图消息
+                        // 若有文本部分：
+                        if (parsed.pureText.isNotBlank()) {
+                            val content = parsed.pureText
+                            val urlPattern = remember { Pattern.compile("https?://[\\w-]+(\\.[\\w-]+)+(/[\\w-./?%&=#@:;+~]*)?") }
+                            val hasUrl = remember(content) { urlPattern.matcher(content).find() }
+                            val linkColor = if (isMe) Color.White else MaterialTheme.colorScheme.primary
 
-                        if (hasUrl) {
-                            val annotatedString = remember(content, linkColor) {
-                                buildAnnotatedString {
-                                    val m = urlPattern.matcher(content)
-                                    var lastIndex = 0
-                                    while (m.find()) {
-                                        val start = m.start()
-                                        val end = m.end()
-                                        append(content.substring(lastIndex, start))
-                                        val url = m.group()
-                                        pushStringAnnotation(tag = "URL", annotation = url)
-                                        withStyle(
-                                            style = SpanStyle(
-                                                color = linkColor,
-                                                textDecoration = TextDecoration.Underline,
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                        ) {
-                                            append(url)
+                            if (hasUrl) {
+                                val annotatedString = remember(content, linkColor) {
+                                    buildAnnotatedString {
+                                        val m = urlPattern.matcher(content)
+                                        var lastIndex = 0
+                                        while (m.find()) {
+                                            val start = m.start()
+                                            val end = m.end()
+                                            append(content.substring(lastIndex, start))
+                                            val url = m.group()
+                                            pushStringAnnotation(tag = "URL", annotation = url)
+                                            withStyle(
+                                                style = SpanStyle(
+                                                    color = linkColor,
+                                                    textDecoration = TextDecoration.Underline,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            ) {
+                                                append(url)
+                                            }
+                                            pop()
+                                            lastIndex = end
                                         }
-                                        pop()
-                                        lastIndex = end
-                                    }
-                                    if (lastIndex < content.length) {
-                                        append(content.substring(lastIndex))
+                                        if (lastIndex < content.length) {
+                                            append(content.substring(lastIndex))
+                                        }
                                     }
                                 }
-                            }
 
-                            ClickableText(
-                                text = annotatedString,
-                                style = LocalTextStyle.current.copy(
+                                ClickableText(
+                                    text = annotatedString,
+                                    style = LocalTextStyle.current.copy(
+                                        fontSize = 14.sp,
+                                        lineHeight = 20.sp,
+                                        color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    onClick = { offset ->
+                                        annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
+                                            .firstOrNull()?.let { annotation ->
+                                                try {
+                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(annotation.item)).apply {
+                                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                                    }
+                                                    context.startActivity(intent)
+                                                } catch (e: Exception) {
+                                                    e.printStackTrace()
+                                                }
+                                            }
+                                    }
+                                )
+                            } else {
+                                Text(
+                                    text = content,
                                     fontSize = 14.sp,
                                     lineHeight = 20.sp,
                                     color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                                ),
-                                onClick = { offset ->
-                                    annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
-                                        .firstOrNull()?.let { annotation ->
-                                            try {
-                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(annotation.item)).apply {
-                                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                                }
-                                                context.startActivity(intent)
-                                            } catch (e: Exception) {
-                                                e.printStackTrace()
-                                            }
-                                        }
-                                }
-                            )
-                        } else {
-                            Text(
-                                text = message.content,
-                                fontSize = 14.sp,
-                                lineHeight = 20.sp,
-                                color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                            )
+                                )
+                            }
+                        }
+
+                        // 若包含图片：分离渲染为缩略图卡片（绝不在文字中裸露 URL）
+                        if (parsed.imageUrls.isNotEmpty()) {
+                            if (parsed.pureText.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                            }
+                            parsed.imageUrls.forEach { rawUrl ->
+                                val fullUrl = ChatContentParser.toFullImageUrl(rawUrl)
+                                AsyncImage(
+                                    model = fullUrl,
+                                    contentDescription = "图片",
+                                    modifier = Modifier
+                                        .widthIn(max = if (parsed.isPureImage) 200.dp else 180.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable { onImageClick(fullUrl) }
+                                        .padding(vertical = 2.dp),
+                                    contentScale = ContentScale.Fit
+                                )
+                            }
                         }
                     }
                 }
 
-                // 高质感液态玻璃长按浮动药丸菜单
+                // 高质感长按浮动操作条
                 if (showMenu) {
                     Popup(
                         alignment = if (isMe) Alignment.TopEnd else Alignment.TopStart,
@@ -919,8 +1014,8 @@ private fun ChatMessageBubble(
                                 Text("回复", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
                             }
 
-                            if (!isImage) {
-                                // 复制
+                            if (parsed.pureText.isNotBlank()) {
+                                // 复制文字
                                 Row(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(8.dp))
@@ -939,6 +1034,24 @@ private fun ChatMessageBubble(
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text("复制", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                                }
+                            }
+
+                            // 收藏表情（如果含有图片）
+                            if (parsed.imageUrls.isNotEmpty()) {
+                                Row(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            showMenu = false
+                                            onCollectSticker(parsed.imageUrls.first())
+                                        }
+                                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("⭐️", fontSize = 12.sp)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("存为表情", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
                                 }
                             }
 
@@ -981,9 +1094,12 @@ private fun GroupInfoSheetContent(
     isLoading: Boolean,
     myRole: String?,
     currentUserId: String?,
+    groupCheckinStatus: GroupCheckinStatusDto? = null,
     onMemberClick: (GroupMemberDto) -> Unit,
     onKickMember: (String) -> Unit,
     onUpdateRole: (String, String) -> Unit,
+    onMuteMember: (String, Int) -> Unit = { _, _ -> },
+    onUnmuteMember: (String) -> Unit = {},
     onLeaveGroup: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
@@ -1003,6 +1119,48 @@ private fun GroupInfoSheetContent(
         )
 
         Spacer(modifier = Modifier.height(10.dp))
+
+        // 群专属签到与等级进度卡片
+        if (groupCheckinStatus != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFF10B981).copy(alpha = 0.12f))
+                    .border(1.dp, Color(0xFF10B981).copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "⚡ 群等级 Lv.${groupCheckinStatus.groupLevel}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = "EXP: ${groupCheckinStatus.groupExp}", fontSize = 11.sp, color = DeepTheme.extended.textSecondary)
+                    }
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Text(
+                        text = "发送「${groupCheckinStatus.checkinWord}」自动打卡获取群经验",
+                        fontSize = 11.sp,
+                        color = DeepTheme.extended.textTertiary
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (groupCheckinStatus.isCheckedIn) Color(0xFF10B981).copy(alpha = 0.2f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = if (groupCheckinStatus.isCheckedIn) "今日已签" else "未签到",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (groupCheckinStatus.isCheckedIn) Color(0xFF10B981) else MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
 
         // 群公告
         Column(
@@ -1199,6 +1357,17 @@ private fun GroupInfoSheetContent(
                             }
                         ) {
                             Text(if (member.role == "admin") "撤销管理" else "设为管理")
+                        }
+                    }
+                    if (member.role != "owner") {
+                        TextButton(
+                            onClick = {
+                                val targetId = member.userId
+                                selectedMemberForAction = null
+                                onMuteMember(targetId, 60)
+                            }
+                        ) {
+                            Text("禁言1h")
                         }
                     }
                     TextButton(

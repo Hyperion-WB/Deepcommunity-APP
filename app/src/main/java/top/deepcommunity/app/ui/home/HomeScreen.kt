@@ -101,6 +101,7 @@ import top.deepcommunity.app.data.model.PostItemDto
 fun HomeScreen(
     onPostClick: (String) -> Unit,
     onOpenDrawer: () -> Unit = {},
+    refreshTrigger: Long = 0L,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -110,6 +111,14 @@ fun HomeScreen(
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
     var previewImageUrl by remember { mutableStateOf<String?>(null) }
+
+    // 监听外部刷新触发（如底栏主页按钮点击）
+    LaunchedEffect(refreshTrigger) {
+        if (refreshTrigger > 0L) {
+            listState.animateScrollToItem(0)
+            viewModel.loadPosts(isRefresh = true)
+        }
+    }
 
     // 自动触底加载下一页监听
     val shouldLoadMore by remember {
@@ -149,17 +158,34 @@ fun HomeScreen(
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 Column(
-                    modifier = Modifier.clickable {
-                        coroutineScope.launch { listState.animateScrollToItem(0) }
-                    }
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            coroutineScope.launch {
+                                listState.animateScrollToItem(0)
+                                viewModel.loadPosts(isRefresh = true)
+                            }
+                        }
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
                 ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "深度社区",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        if (uiState.isLoading) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            CircularProgressIndicator(
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(14.dp),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                     Text(
-                        text = "深度社区",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = "记录日常 · 分享热爱",
+                        text = "记录日常 · 分享热爱 (点击刷新)",
                         style = MaterialTheme.typography.labelSmall,
                         color = DeepTheme.extended.textTertiary
                     )
@@ -329,6 +355,46 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.height(10.dp))
                     }
 
+                }
+            }
+        }
+
+        // 全站系统广播公告胶囊横幅
+        var isAnnouncementDismissed by remember { mutableStateOf(false) }
+        val ann = uiState.announcement
+        if (ann != null && ann.content.isNotBlank() && !isAnnouncementDismissed) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 4.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                    .border(0.8.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = "📢", fontSize = 13.sp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = ann.content,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                IconButton(
+                    onClick = { isAnnouncementDismissed = true },
+                    modifier = Modifier.size(20.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "关闭公告",
+                        tint = DeepTheme.extended.textTertiary,
+                        modifier = Modifier.size(14.dp)
+                    )
                 }
             }
         }

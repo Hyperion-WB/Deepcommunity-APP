@@ -20,6 +20,7 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import top.deepcommunity.app.core.common.Resource
 import top.deepcommunity.app.data.model.ChatMessageDto
+import top.deepcommunity.app.data.model.GroupCheckinStatusDto
 import top.deepcommunity.app.data.model.GroupMemberDto
 import top.deepcommunity.app.data.model.StickerItemDto
 import top.deepcommunity.app.data.repository.AuthRepository
@@ -50,7 +51,9 @@ data class ChatUiState(
     val groupMembers: List<GroupMemberDto> = emptyList(),
     val groupAnnouncement: String = "",
     val myRole: String? = null,
-    val isLoadingGroupMembers: Boolean = false
+    val isLoadingGroupMembers: Boolean = false,
+    val isRollingDice: Boolean = false,
+    val groupCheckinStatus: GroupCheckinStatusDto? = null
 )
 
 sealed interface ChatEvent {
@@ -243,7 +246,7 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    // 发送图片消息
+    // 发送图片消息（支持文字+图片图文混排）
     fun uploadAndSendImage(uri: Uri) {
         viewModelScope.launch {
             try {
@@ -257,7 +260,12 @@ class ChatViewModel @Inject constructor(
                         is Resource.Loading -> _uiState.update { it.copy(isUploadingImage = true) }
                         is Resource.Success -> {
                             _uiState.update { it.copy(isUploadingImage = false) }
-                            doSend(result.data)
+                            val currentInput = _uiState.value.inputText.trim()
+                            val imageUrl = result.data
+                            _uiState.update { it.copy(inputText = "") }
+                            // 如果用户输入了文字，则将文字与图片路径组装为图文消息
+                            val finalContent = if (currentInput.isNotBlank()) "$currentInput\n$imageUrl" else imageUrl
+                            doSend(finalContent)
                         }
                         is Resource.Error -> {
                             _uiState.update { it.copy(isUploadingImage = false) }
@@ -268,6 +276,89 @@ class ChatViewModel @Inject constructor(
             } catch (e: Exception) {
                 _uiState.update { it.copy(isUploadingImage = false) }
                 _eventFlow.emit(ChatEvent.ShowToast("读取图片失败"))
+            }
+        }
+    }
+
+    // 摇骰子
+    fun rollDice() {
+        if (!_uiState.value.isGroupChat || _uiState.value.isRollingDice) return
+        viewModelScope.launch {
+            chatRepository.rollDice(convId).collect { result ->
+                when (result) {
+                    is Resource.Loading -> _uiState.update { it.copy(isRollingDice = true) }
+                    is Resource.Success -> {
+                        _uiState.update { state ->
+                            state.copy(
+                                messages = state.messages + result.data,
+                                isRollingDice = false
+                            )
+                        }
+                        _eventFlow.emit(ChatEvent.ScrollToBottom)
+                    }
+                    is Resource.Error -> {
+                        _uiState.update { it.copy(isRollingDice = false) }
+                        _eventFlow.emit(ChatEvent.ShowToast(result.message))
+                    }
+                }
+            }
+        }
+    }
+
+    // 收藏到表情
+    fun collectSticker(url: String) {
+        viewModelScope.launch {
+            chatRepository.collectSticker(url).collect { result ->
+                when (result) {
+                    is Resource.Success -> {
+                        _eventFlow.emit(ChatEvent.ShowToast("✓ ${result.data}"))
+                        loadStickers()
+                    }
+                    is Resource.Error -> _eventFlow.emit(ChatEvent.ShowToast(result.message))
+                    else -> {}
+                }
+            }
+        }
+    }
+
+    // 禁言与解禁
+    fun muteMember(targetUserId: String, durationMinutes: Int = 60) {
+        viewModelScope.launch {
+            chatRepository.muteMember(convId, targetUserId, durationMinutes).collect { result ->
+                when (result) {
+                    is Resource.Success -> {
+                        _eventFlow.emit(ChatEvent.ShowToast(result.data))
+                        loadGroupMembers()
+                    }
+                    is Resource.Error -> _eventFlow.emit(ChatEvent.ShowToast(result.message))
+                    else -> {}
+                }
+            }
+        }
+    }
+
+    fun unmuteMember(targetUserId: String) {
+        viewModelScope.launch {
+            chatRepository.unmuteMember(convId, targetUserId).collect { result ->
+                when (result) {
+                    is Resource.Success -> {
+                        _eventFlow.emit(ChatEvent.ShowToast(result.data))
+                        loadGroupMembers()
+                    }
+                    is Resource.Error -> _eventFlow.emit(ChatEvent.ShowToast(result.message))
+                    else -> {}
+                }
+            }
+        }
+    }
+
+    fun loadGroupCheckinStatus() {
+        if (!_uiState.value.isGroupChat) return
+        viewModelScope.launch {
+            chatRepository.getGroupCheckinStatus(convId).collect { result ->
+                if (result is Resource.Success) {
+                    _uiState.update { it.copy(groupCheckinStatus = result.data) }
+                }
             }
         }
     }
@@ -310,6 +401,7 @@ class ChatViewModel @Inject constructor(
                                 isLoading = false
                             )
                         }
+                        loadGroupCheckinStatus()
                         _eventFlow.emit(ChatEvent.ScrollToBottom)
                     }
                     is Resource.Error -> {

@@ -21,7 +21,9 @@ import top.deepcommunity.app.data.model.PollDetailDto
 import top.deepcommunity.app.data.model.PollOptionCreateDto
 import top.deepcommunity.app.data.model.PollVoteRequest
 import top.deepcommunity.app.data.model.PostItemDto
+import top.deepcommunity.app.data.model.ReactionToggleRequest
 import top.deepcommunity.app.data.model.SaveDraftRequest
+import top.deepcommunity.app.data.model.SystemAnnouncementDto
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -360,6 +362,36 @@ class PostRepository @Inject constructor(
             }
         } catch (_: Exception) {
             emit(Resource.Error("清空异常"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    // 表情回应 Reactions
+    fun toggleReaction(targetType: String, targetId: String, emoji: String): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = postApi.toggleReaction(ReactionToggleRequest(targetType, targetId, emoji))
+            if (response.isSuccessful) {
+                emit(Resource.Success("已更新回应"))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string())))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "操作失败"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    // 全局系统公告
+    fun getCurrentAnnouncement(): Flow<Resource<SystemAnnouncementDto>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = postApi.getCurrentAnnouncement()
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("暂无公告"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "加载公告失败"))
         }
     }.flowOn(Dispatchers.IO)
 

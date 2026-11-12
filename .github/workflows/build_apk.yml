@@ -45,16 +45,23 @@ jobs:
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          tag_name: "v1.0.0"
-          name: "Deepcommunity-APP v1.0.0"
+          tag_name: ${{ github.ref_name }}
+          name: "Deepcommunity-APP ${{ github.ref_name }}"
           files: output_apk/DeepCommunity-debug.apk
           body: |
-            ### 深度社区 (Deep Community) 原生 Android 客户端
-            - 极客黑白极简 & 液态毛玻璃设计规范
-            - 动态广场、社群实时通讯、原生长图海报生成与分享
-            - 沉浸式多点触控图片浏览器、发帖 Markdown 实时预览
-            - 桌面灵动微件、一键打卡签到
+            ### 深度社区 (Deep Community) 原生 Android 客户端 ${{ github.ref_name }}
+            - 修复群聊图片显示问题（图文混排分离渲染，彻底消除裸露路径）
+            - 修复回复带图消息（输入条与引用快照智能折叠，微缩预览）
+            - 新增群内摇骰子互动 🎲（服务端生成·真实防作弊点数卡片）
+            - 新增群内每日签到打卡卡片与群等级经验
+            - 新增点击顶部标题/底栏主页实时刷新与数据同步（解决帖子与Web端不同步）
+            - 新增全站系统广播公告胶囊横幅
+            - 新增帖子态度表情回应（Reactions: 👍❤️🚀💡🎉🔥）
+            - 新增个人中心打卡战绩、连续打卡天数与补签卡入口
+            - 新增个人中心成就图鉴与勋章墙展示
+            - 视觉质感与微动效全方位升级，去除方块水波纹，增强触觉微反馈
 
             **下载说明**：
             直接点击下方 Assets 中的 `DeepCommunity-debug.apk` 即可下载安装到安卓设备体验。

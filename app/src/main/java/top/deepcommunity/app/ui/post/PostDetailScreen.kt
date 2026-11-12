@@ -551,6 +551,45 @@ fun PostDetailScreen(
                                 }
                             }
 
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // 表情回应 Reactions 快捷药丸条
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(DeepTheme.extended.surfaceElevated.copy(alpha = 0.5f))
+                                    .border(0.8.dp, DeepTheme.extended.border, RoundedCornerShape(12.dp))
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "态度回应",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = DeepTheme.extended.textTertiary
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    val emojis = listOf("👍", "❤️", "🚀", "💡", "🎉", "🔥")
+                                    emojis.forEach { emoji ->
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(MaterialTheme.colorScheme.surface)
+                                                .clickable {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    viewModel.toggleReaction(emoji)
+                                                }
+                                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(text = emoji, fontSize = 15.sp)
+                                        }
+                                    }
+                                }
+                            }
+
                             Spacer(modifier = Modifier.height(24.dp))
 
                             Text(

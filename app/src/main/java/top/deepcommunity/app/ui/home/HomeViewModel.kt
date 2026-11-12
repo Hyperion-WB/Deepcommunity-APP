@@ -16,6 +16,7 @@ import top.deepcommunity.app.core.common.Resource
 import top.deepcommunity.app.data.local.SearchHistoryManager
 import top.deepcommunity.app.data.model.CategoryDto
 import top.deepcommunity.app.data.model.PostItemDto
+import top.deepcommunity.app.data.model.SystemAnnouncementDto
 import top.deepcommunity.app.data.repository.PostRepository
 import top.deepcommunity.app.data.repository.UserRepository
 import java.text.SimpleDateFormat
@@ -36,6 +37,7 @@ data class HomeUiState(
     val isSearchActive: Boolean = false,
     val isCheckedIn: Boolean = false,
     val isCheckingIn: Boolean = false,
+    val announcement: SystemAnnouncementDto? = null,
     val errorMessage: String? = null
 )
 
@@ -60,7 +62,18 @@ class HomeViewModel @Inject constructor(
         // 读取本地打卡日期记忆，跨进程、重启应用保持打卡状态
         checkTodayCheckinStatus()
         loadCategories()
+        loadAnnouncement()
         loadPosts(isRefresh = true)
+    }
+
+    fun loadAnnouncement() {
+        viewModelScope.launch {
+            postRepository.getCurrentAnnouncement().collect { result ->
+                if (result is Resource.Success) {
+                    _uiState.update { it.copy(announcement = result.data) }
+                }
+            }
+        }
     }
 
     private fun checkTodayCheckinStatus() {
@@ -142,6 +155,8 @@ class HomeViewModel @Inject constructor(
         if (isRefresh) {
             currentPage = 1
             _uiState.update { it.copy(isEndReached = false) }
+            loadAnnouncement()
+            checkTodayCheckinStatus()
         }
 
         viewModelScope.launch {

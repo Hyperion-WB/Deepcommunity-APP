@@ -56,6 +56,7 @@ fun MainScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     var currentTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
     var isBarVisible by remember { mutableStateOf(true) }
+    var homeRefreshTrigger by remember { mutableStateOf(0L) }
 
     val notificationViewModel: NotificationViewModel = hiltViewModel()
     val notificationUiState by notificationViewModel.uiState.collectAsState()
@@ -143,7 +144,8 @@ fun MainScreen(
                         onPostClick = onNavigateToPostDetail,
                         onOpenDrawer = {
                             coroutineScope.launch { drawerState.open() }
-                        }
+                        },
+                        refreshTrigger = homeRefreshTrigger
                     )
                     MainTab.CHAT -> ConversationListScreen(onConversationClick = onNavigateToChatDetail)
                     MainTab.CREATE -> {} // 浮动发帖按钮
@@ -179,6 +181,10 @@ fun MainScreen(
                 unreadNotificationCount = notificationUiState.unreadCount,
                 onTabSelected = { tab ->
                     if (tab != MainTab.CREATE) {
+                        if (currentTab == MainTab.HOME && tab == MainTab.HOME) {
+                            // 再次点击首页主图/Tab，回到顶部并强制刷新
+                            homeRefreshTrigger = System.currentTimeMillis()
+                        }
                         currentTab = tab
                     }
                     isBarVisible = true

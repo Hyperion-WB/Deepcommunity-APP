@@ -11,8 +11,10 @@ import retrofit2.http.PUT
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
+import top.deepcommunity.app.data.model.AchievementDto
 import top.deepcommunity.app.data.model.BlockActionResponse
 import top.deepcommunity.app.data.model.BlockedUserDto
+import top.deepcommunity.app.data.model.CheckinStatusDetailDto
 import top.deepcommunity.app.data.model.MessageResponse
 import top.deepcommunity.app.data.model.PostItemDto
 import top.deepcommunity.app.data.model.UploadImageResponse
@@ -38,6 +40,15 @@ interface UserApi {
 
     @POST("api/users/checkin")
     suspend fun checkIn(): Response<MessageResponse>
+
+    @GET("api/users/checkin/status")
+    suspend fun getCheckinStatus(): Response<CheckinStatusDetailDto>
+
+    @POST("api/users/checkin/makeup")
+    suspend fun makeupCheckin(@Body payload: Map<String, String> = emptyMap()): Response<MessageResponse>
+
+    @GET("api/achievements/me")
+    suspend fun getMyAchievements(): Response<List<AchievementDto>>
 
     @POST("api/users/{username}/block")
     suspend fun blockUser(@Path("username") username: String): Response<BlockActionResponse>

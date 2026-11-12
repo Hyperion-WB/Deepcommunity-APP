@@ -426,4 +426,21 @@ class PostDetailViewModel @Inject constructor(
             }
         }
     }
+
+    fun toggleReaction(emoji: String) {
+        viewModelScope.launch {
+            postRepository.toggleReaction(targetType = "post", targetId = postId, emoji = emoji).collect { result ->
+                when (result) {
+                    is Resource.Success -> {
+                        _eventFlow.emit(PostDetailEvent.ShowToast("已回应 $emoji"))
+                        loadPostDetail()
+                    }
+                    is Resource.Error -> {
+                        _eventFlow.emit(PostDetailEvent.ShowToast(result.message))
+                    }
+                    else -> {}
+                }
+            }
+        }
+    }
 }

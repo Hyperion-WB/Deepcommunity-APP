@@ -279,3 +279,21 @@ data class NotificationDto(
 data class UnreadCountDto(
     val count: Int = 0
 )
+
+@Serializable
+data class ReactionToggleRequest(
+    @SerialName("target_type")
+    val targetType: String = "post",
+    @SerialName("target_id")
+    val targetId: String,
+    val emoji: String
+)
+
+@Serializable
+data class SystemAnnouncementDto(
+    val id: String? = null,
+    val content: String = "",
+    val title: String? = null,
+    @SerialName("created_at")
+    val createdAt: String? = null
+)

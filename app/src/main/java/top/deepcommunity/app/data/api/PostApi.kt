@@ -24,7 +24,9 @@ import top.deepcommunity.app.data.model.PollCreateRequest
 import top.deepcommunity.app.data.model.PollDetailDto
 import top.deepcommunity.app.data.model.PollVoteRequest
 import top.deepcommunity.app.data.model.PostItemDto
+import top.deepcommunity.app.data.model.ReactionToggleRequest
 import top.deepcommunity.app.data.model.SaveDraftRequest
+import top.deepcommunity.app.data.model.SystemAnnouncementDto
 import top.deepcommunity.app.data.model.UnreadCountDto
 import top.deepcommunity.app.data.model.UploadImageResponse
 
@@ -116,4 +118,12 @@ interface PostApi {
 
     @DELETE("api/users/me/notifications")
     suspend fun clearAllNotifications(): Response<okhttp3.ResponseBody>
+
+    // 表情回应 Reactions
+    @POST("api/reactions/toggle")
+    suspend fun toggleReaction(@Body request: ReactionToggleRequest): Response<okhttp3.ResponseBody>
+
+    // 全站广播系统公告
+    @GET("api/admin/announcement/current")
+    suspend fun getCurrentAnnouncement(): Response<SystemAnnouncementDto>
 }
