@@ -49,7 +49,7 @@ import top.deepcommunity.app.data.repository.ChatRepository
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GroupRequestsBottomSheet(
-    groupId: Long,
+    groupId: String,
     chatRepository: ChatRepository,
     onDismissRequest: () -> Unit
 ) {

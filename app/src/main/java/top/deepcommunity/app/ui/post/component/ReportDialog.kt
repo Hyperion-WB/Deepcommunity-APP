@@ -54,7 +54,7 @@ private val REASONS = listOf(
 @Composable
 fun ReportDialog(
     targetType: String, // "POST" | "COMMENT" | "USER"
-    targetId: Long,
+    targetId: String,
     targetTitle: String? = null,
     postRepository: PostRepository,
     onDismissRequest: () -> Unit
@@ -125,9 +125,9 @@ fun ReportDialog(
                                 else Color.Transparent
                             )
                             .border(
-                                width = 1.dp,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else extColors.border,
-                                shape = RoundedCornerShape(8.dp)
+                                1.dp,
+                                if (isSelected) MaterialTheme.colorScheme.primary else extColors.border,
+                                RoundedCornerShape(8.dp)
                             )
                             .clickable { selectedReason = code }
                             .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -179,7 +179,7 @@ fun ReportDialog(
                     text = "取消",
                     onClick = onDismissRequest,
                     modifier = Modifier.weight(1f),
-                    outlined = true,
+                    isPrimary = false,
                     enabled = !isSubmitting
                 )
 
@@ -189,11 +189,11 @@ fun ReportDialog(
                         if (isSubmitting) return@DeepButton
                         isSubmitting = true
                         scope.launch {
-                            val combinedReason = "$selectedReason: $description".trimEnd(':', ' ')
                             postRepository.createReport(
                                 targetType = targetType.uppercase(),
                                 targetId = targetId,
-                                reason = combinedReason
+                                reasonType = selectedReason,
+                                detail = description
                             ).collect { res ->
                                 isSubmitting = false
                                 when (res) {

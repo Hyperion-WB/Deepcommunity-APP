@@ -81,12 +81,6 @@ interface UserApi {
     @GET("api/users/{username}/following")
     suspend fun getFollowing(@Path("username") username: String): Response<List<FollowUserItemDto>>
 
-    @POST("api/users/{username}/follow")
-    suspend fun followUser(@Path("username") username: String): Response<MessageResponse>
-
-    @DELETE("api/users/{username}/follow")
-    suspend fun unfollowUser(@Path("username") username: String): Response<MessageResponse>
-
     @GET("api/users/profile/{username}")
     suspend fun getUserPublicProfile(@Path("username") username: String): Response<PublicUserProfileDto>
 

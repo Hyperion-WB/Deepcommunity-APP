@@ -219,12 +219,12 @@ fun FollowListBottomSheet(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { onUserClick(item.id) }
+                                    .clickable { onUserClick(item.id.toLongOrNull() ?: 0L) }
                                     .padding(horizontal = 16.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 UserAvatar(
-                                    avatarUrl = item.avatar,
+                                    avatarUrl = item.avatarUrl,
                                     displayName = displayName,
                                     size = 44.dp
                                 )

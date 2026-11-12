@@ -561,9 +561,8 @@ fun ChatScreen(
 
         // 入群审批中心抽屉
         if (showGroupRequestsSheet) {
-            val gIdLong = viewModel.convId.toLongOrNull() ?: 0L
             GroupRequestsBottomSheet(
-                groupId = gIdLong,
+                groupId = viewModel.convId,
                 chatRepository = viewModel.chatRepo,
                 onDismissRequest = { showGroupRequestsSheet = false }
             )
@@ -589,7 +588,7 @@ private fun EnhancedStickerDrawer(
     stickers: List<StickerItemDto>,
     isLoadingStickers: Boolean,
     onStickerClick: (StickerItemDto) -> Unit,
-    onStickerDelete: ((Long) -> Unit)? = null
+    onStickerDelete: ((String) -> Unit)? = null
 ) {
     val haptic = LocalHapticFeedback.current
     var stickerToDelete by remember { mutableStateOf<StickerItemDto?>(null) }

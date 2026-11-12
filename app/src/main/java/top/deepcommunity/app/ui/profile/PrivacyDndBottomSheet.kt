@@ -56,8 +56,8 @@ fun PrivacyDndBottomSheet(
     val scope = rememberCoroutineScope()
     val extColors = LocalExtendedColors.current
 
-    var allowStrangerDm by remember { mutableStateOf(true) }
-    var showOnlineStatus by remember { mutableStateOf(true) }
+    var hidePosts by remember { mutableStateOf(false) }
+    var hideCollections by remember { mutableStateOf(false) }
     var isDndEnabled by remember { mutableStateOf(false) }
     var startTime by remember { mutableStateOf("23:00") }
     var endTime by remember { mutableStateOf("07:00") }
@@ -109,7 +109,7 @@ fun PrivacyDndBottomSheet(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 允许陌生人发私信
+            // 隐藏我的主页动态
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -119,20 +119,20 @@ fun PrivacyDndBottomSheet(
             ) {
                 Column {
                     Text(
-                        text = "接收陌生人私信",
+                        text = "隐藏主页动态",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = "关闭后仅互相关注的好友可以向您发起私聊",
+                        text = "开启后其他居民访问您的个人主页时将无法查看您的发帖",
                         fontSize = 11.sp,
                         color = extColors.textTertiary
                     )
                 }
                 Switch(
-                    checked = allowStrangerDm,
-                    onCheckedChange = { allowStrangerDm = it },
+                    checked = hidePosts,
+                    onCheckedChange = { hidePosts = it },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
                         checkedTrackColor = MaterialTheme.colorScheme.primary
@@ -140,7 +140,7 @@ fun PrivacyDndBottomSheet(
                 )
             }
 
-            // 展示在线状态
+            // 隐藏我的个人收藏
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -150,20 +150,20 @@ fun PrivacyDndBottomSheet(
             ) {
                 Column {
                     Text(
-                        text = "显示在线状态",
+                        text = "隐藏个人收藏",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = "关闭后其他居民将无法获知您是否在线",
+                        text = "开启后其他居民将无法获知您的收藏列表",
                         fontSize = 11.sp,
                         color = extColors.textTertiary
                     )
                 }
                 Switch(
-                    checked = showOnlineStatus,
-                    onCheckedChange = { showOnlineStatus = it },
+                    checked = hideCollections,
+                    onCheckedChange = { hideCollections = it },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
                         checkedTrackColor = MaterialTheme.colorScheme.primary
@@ -222,13 +222,13 @@ fun PrivacyDndBottomSheet(
                     isSaving = true
                     scope.launch {
                         val privacyReq = UpdatePrivacyRequest(
-                            allowStrangerDm = allowStrangerDm,
-                            showOnlineStatus = showOnlineStatus
+                            hidePosts = hidePosts,
+                            hideCollections = hideCollections
                         )
                         val dndReq = UpdateDndRequest(
-                            enabled = isDndEnabled,
-                            startTime = startTime,
-                            endTime = endTime
+                            dndEnabled = isDndEnabled,
+                            dndStart = startTime,
+                            dndEnd = endTime
                         )
 
                         launch { userRepository.updatePrivacy(privacyReq).collect {} }

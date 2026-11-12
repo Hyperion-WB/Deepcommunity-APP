@@ -173,7 +173,7 @@ fun UserProfileBottomSheet(
                             .border(2.dp, extColors.glassBorder, CircleShape)
                     ) {
                         UserAvatar(
-                            avatarUrl = profile.avatar,
+                            avatarUrl = profile.avatarUrl,
                             displayName = displayName,
                             size = 76.dp
                         )
@@ -242,10 +242,10 @@ fun UserProfileBottomSheet(
                                 .padding(vertical = 12.dp),
                             horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
-                            ProfileStatItem(title = "获赞", value = profile.likeCount.toString())
-                            ProfileStatItem(title = "帖子", value = profile.postCount.toString())
+                            ProfileStatItem(title = "经验", value = profile.exp.toString())
+                            ProfileStatItem(title = "动态", value = profile.postCount.toString())
                             ProfileStatItem(title = "关注", value = profile.followingCount.toString())
-                            ProfileStatItem(title = "粉丝", value = profile.followerCount.toString())
+                            ProfileStatItem(title = "粉丝", value = profile.followersCount.toString())
                         }
                     }
 
@@ -288,7 +288,7 @@ fun UserProfileBottomSheet(
                                 }
                             },
                             modifier = Modifier.weight(1f),
-                            outlined = isFollowing
+                            isPrimary = !isFollowing
                         )
 
                         // 发私信
@@ -300,7 +300,7 @@ fun UserProfileBottomSheet(
                                     onNavigateToChat(userId, displayName)
                                 },
                                 modifier = Modifier.weight(1f),
-                                outlined = !isFollowing
+                                isPrimary = isFollowing
                             )
                         }
                     }

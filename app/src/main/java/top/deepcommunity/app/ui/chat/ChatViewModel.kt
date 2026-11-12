@@ -323,7 +323,7 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun deleteSticker(stickerId: Long) {
+    fun deleteSticker(stickerId: String) {
         viewModelScope.launch {
             chatRepository.deleteSticker(stickerId).collect { result ->
                 when (result) {

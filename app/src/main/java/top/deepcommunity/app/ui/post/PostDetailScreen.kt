@@ -115,7 +115,7 @@ fun PostDetailScreen(
     var previewImageUrl by remember { mutableStateOf<String?>(null) }
     var showSharePosterDialog by remember { mutableStateOf(false) }
     var showReportPostDialog by remember { mutableStateOf(false) }
-    var reportCommentTarget by remember { mutableStateOf<Pair<Long, String>?>(null) } // id to content
+    var reportCommentTarget by remember { mutableStateOf<Pair<String, String>?>(null) } // id to content
     var selectedUserId by remember { mutableStateOf<Long?>(null) }
 
     // 评论区相册选图上传
@@ -668,7 +668,7 @@ fun PostDetailScreen(
             uiState.post?.let { p ->
                 ReportDialog(
                     targetType = "POST",
-                    targetId = p.id.toLongOrNull() ?: 0L,
+                    targetId = p.id,
                     targetTitle = p.title,
                     postRepository = viewModel.postRepo,
                     onDismissRequest = { showReportPostDialog = false }
@@ -709,7 +709,7 @@ private fun CommentItem(
     onUserClick: (Long) -> Unit,
     onAcceptClick: (Long) -> Unit,
     onFeatureClick: (Long) -> Unit,
-    onReportClick: (Long, String) -> Unit
+    onReportClick: (String, String) -> Unit
 ) {
     var isRepliesExpanded by remember { mutableStateOf(false) }
     var isMenuExpanded by remember { mutableStateOf(false) }
@@ -891,7 +891,7 @@ private fun CommentItem(
                         text = { Text("🚩 举报违规评论", fontSize = 12.sp) },
                         onClick = {
                             isMenuExpanded = false
-                            onReportClick(cIdLong, comment.content)
+                            onReportClick(comment.id, comment.content)
                         }
                     )
                 }
