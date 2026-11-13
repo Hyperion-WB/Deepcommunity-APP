@@ -787,6 +787,8 @@ private fun FilterChipsRow(
     }
 }
 
+private val HTML_TAG_REGEX = Regex("<[^>]*>")
+
 @Composable
 fun PostCard(
     post: PostItemDto,
@@ -797,44 +799,13 @@ fun PostCard(
     modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.985f else 1f,
-        animationSpec = DeepMotion.bouncy(),
-        label = "card_scale"
-    )
-
-    val isDark = MaterialTheme.colorScheme.background.red < 0.5f
-    val specularBorder = Brush.verticalGradient(
-        colors = if (isDark) {
-            listOf(
-                Color.White.copy(alpha = 0.25f),
-                Color.White.copy(alpha = 0.08f),
-                Color.White.copy(alpha = 0.03f)
-            )
-        } else {
-            listOf(
-                Color.Black.copy(alpha = 0.14f),
-                Color.Black.copy(alpha = 0.06f),
-                Color.Black.copy(alpha = 0.02f)
-            )
-        }
-    )
 
     Box(
         modifier = modifier
-            .scale(scale)
             .fillMaxWidth()
-            .shadow(
-                elevation = 6.dp,
-                shape = RoundedCornerShape(18.dp),
-                ambientColor = if (isDark) Color.Black.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.08f),
-                spotColor = if (isDark) Color.Black.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.12f)
-            )
-            .clip(RoundedCornerShape(18.dp))
-            .background(if (isDark) DeepTheme.extended.surfaceElevated.copy(alpha = 0.88f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.94f))
-            .border(0.8.dp, specularBorder, RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(0.8.dp, DeepTheme.extended.border, RoundedCornerShape(16.dp))
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -966,8 +937,11 @@ fun PostCard(
             val contentSnippet = post.contentMd ?: post.contentHtml
             if (!contentSnippet.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(6.dp))
+                val cleanSnippet = remember(contentSnippet) {
+                    contentSnippet.replace(HTML_TAG_REGEX, "").take(120)
+                }
                 Text(
-                    text = contentSnippet.replace(Regex("<[^>]*>"), "").take(120),
+                    text = cleanSnippet,
                     fontSize = 13.sp,
                     lineHeight = 18.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1093,7 +1067,8 @@ private fun PostImageGrid(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 rowImages.forEach { imgUrl ->
-                    val fullUrl = if (!imgUrl.startsWith("http")) Constants.BASE_URL + imgUrl.removePrefix("/") else imgUrl
+                    val fullUrl = if (imgUrl.startsWith("http://") || imgUrl.startsWith("https://")) imgUrl
+                        else Constants.BASE_URL.trimEnd('/') + "/" + imgUrl.trimStart('/')
                     AsyncImage(
                         model = fullUrl,
                         contentDescription = null,

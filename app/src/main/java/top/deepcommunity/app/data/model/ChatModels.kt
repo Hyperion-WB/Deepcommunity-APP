@@ -1,9 +1,11 @@
 package top.deepcommunity.app.data.model
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import top.deepcommunity.app.core.common.Constants
 
+@Immutable
 @Serializable
 data class ConversationDto(
     val id: String,
@@ -44,6 +46,7 @@ data class ConversationDto(
         }
 }
 
+@Immutable
 @Serializable
 data class GroupRoomDto(
     val id: String,
@@ -81,6 +84,7 @@ data class GroupRoomDto(
         }
 }
 
+@Immutable
 @Serializable
 data class GroupMemberDto(
     @SerialName("user_id")
@@ -105,6 +109,7 @@ data class GroupMemberDto(
         }
 }
 
+@Immutable
 @Serializable
 data class ChatMessageDto(
     val id: String,

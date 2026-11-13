@@ -1,5 +1,6 @@
 package top.deepcommunity.app.data.model
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -23,6 +24,7 @@ data class LoginResponse(
     val tokenType: String = "bearer"
 )
 
+@Immutable
 @Serializable
 data class UserDto(
     val id: String,

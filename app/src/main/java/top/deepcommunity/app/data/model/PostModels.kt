@@ -1,8 +1,10 @@
 package top.deepcommunity.app.data.model
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+@Immutable
 @Serializable
 data class CategoryDto(
     val id: Int,
@@ -11,6 +13,7 @@ data class CategoryDto(
     val icon: String? = null
 )
 
+@Immutable
 @Serializable
 data class PostAuthorDto(
     val id: String? = null,
@@ -26,6 +29,7 @@ data class PostAuthorDto(
         get() = avatarUrl?.takeIf { it.isNotBlank() } ?: avatar?.takeIf { it.isNotBlank() }
 }
 
+@Immutable
 @Serializable
 data class PostItemDto(
     val id: String,
@@ -195,6 +199,7 @@ data class SaveDraftRequest(
     val imageUrls: List<String> = emptyList()
 )
 
+@Immutable
 @Serializable
 data class CommentDto(
     val id: String,
