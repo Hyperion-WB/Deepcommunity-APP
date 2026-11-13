@@ -38,6 +38,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Settings
 import top.deepcommunity.app.ui.profile.FollowListBottomSheet
@@ -237,37 +240,71 @@ fun ProfileScreen(
                                 }
                             }
 
-                            // 每日签到按钮
+                            // 每日签到（已签到显示静止状态标签，未签到显示操作按钮）
                             val isChecked = uiState.isCheckedIn
-                            val btnBg = if (!isChecked) MaterialTheme.colorScheme.primary else DeepTheme.extended.surfaceElevated
-                            val btnTextColor = if (!isChecked) MaterialTheme.colorScheme.onPrimary else DeepTheme.extended.textTertiary
-
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(btnBg)
-                                    .then(
-                                        if (isChecked) Modifier.border(0.8.dp, DeepTheme.extended.border, RoundedCornerShape(12.dp))
-                                        else Modifier
+                            if (isChecked) {
+                                // 已经签到：不再显示打卡按钮，仅展示已签到状态胶囊
+                                Row(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFF10B981).copy(alpha = 0.10f))
+                                        .border(0.8.dp, Color(0xFF10B981).copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "已签到",
+                                        tint = Color(0xFF10B981),
+                                        modifier = Modifier.size(13.dp)
                                     )
-                                    .clickable(
-                                        enabled = !isChecked && !uiState.isCheckingIn,
-                                        onClick = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            viewModel.checkIn()
-                                        }
-                                    )
-                                    .padding(horizontal = 12.dp, vertical = 7.dp)
-                            ) {
-                                if (uiState.isCheckingIn) {
-                                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(16.dp), color = btnTextColor)
-                                } else {
+                                    Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = if (isChecked) "✓ 已签到" else "每日签到",
+                                        text = "今日已签到",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = btnTextColor
+                                        color = Color(0xFF10B981)
                                     )
+                                }
+                            } else {
+                                // 未签到：显示每日签到操作按钮
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(MaterialTheme.colorScheme.primary)
+                                        .clickable(
+                                            enabled = !uiState.isCheckingIn,
+                                            onClick = {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                viewModel.checkIn()
+                                            }
+                                        )
+                                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (uiState.isCheckingIn) {
+                                        CircularProgressIndicator(
+                                            strokeWidth = 2.dp,
+                                            modifier = Modifier.size(15.dp),
+                                            color = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                    } else {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.Bolt,
+                                                contentDescription = "每日签到",
+                                                tint = MaterialTheme.colorScheme.onPrimary,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = "每日签到",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onPrimary
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -385,8 +422,13 @@ fun ProfileScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(text = "⚡", fontSize = 16.sp)
-                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Icon(
+                                        imageVector = Icons.Outlined.CalendarMonth,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Column {
                                         Text(
                                             text = "连续打卡 ${checkin.streak} 天 (最高 ${checkin.bestStreak} 天)",
@@ -410,41 +452,6 @@ fun ProfileScreen(
                                             .padding(horizontal = 10.dp, vertical = 5.dp)
                                     ) {
                                         Text(text = "一键补签", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-                            }
-                        }
-
-                        // 我的成就勋章墙
-                        if (uiState.achievements.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(14.dp))
-                            Column {
-                                Text(
-                                    text = "成就勋章 (${uiState.achievements.size})",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = DeepTheme.extended.textSecondary
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .horizontalScroll(rememberScrollState()),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    uiState.achievements.forEach { ach ->
-                                        Row(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .background(MaterialTheme.colorScheme.surface)
-                                                .border(0.8.dp, DeepTheme.extended.border, RoundedCornerShape(10.dp))
-                                                .padding(horizontal = 8.dp, vertical = 5.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(text = ach.icon, fontSize = 14.sp)
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(text = ach.name, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-                                        }
                                     }
                                 }
                             }

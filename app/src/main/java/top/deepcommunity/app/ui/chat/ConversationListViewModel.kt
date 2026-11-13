@@ -13,14 +13,28 @@ import top.deepcommunity.app.data.model.ConversationDto
 import top.deepcommunity.app.data.model.GroupRoomDto
 import top.deepcommunity.app.data.repository.ChatRepository
 import javax.inject.Inject
+import kotlin.math.max
 
 data class ConversationListUiState(
-    val selectedTab: Int = 0, // 0: 私聊, 1: 群聊, 2: 提醒
+    val selectedTab: Int = 0, // 0: 私聊, 1: 群聊
     val conversations: List<ConversationDto> = emptyList(),
     val groups: List<GroupRoomDto> = emptyList(),
+    val totalUnreadCount: Int = 0,
     val isLoading: Boolean = false,
     val errorMessage: String? = null
-)
+) {
+    val privateUnreadCount: Int
+        get() = conversations.sumOf { it.unreadCount }
+
+    val groupUnreadCount: Int
+        get() = groups.sumOf { it.unreadCount }
+
+    val effectiveTotalUnread: Int
+        get() {
+            val sum = privateUnreadCount + groupUnreadCount
+            return if (totalUnreadCount > 0) max(totalUnreadCount, sum) else sum
+        }
+}
 
 @HiltViewModel
 class ConversationListViewModel @Inject constructor(
@@ -31,8 +45,8 @@ class ConversationListViewModel @Inject constructor(
     val uiState: StateFlow<ConversationListUiState> = _uiState.asStateFlow()
 
     init {
-        loadConversations()
-        loadGroups()
+        refreshAll()
+        listenRealtime()
     }
 
     fun selectTab(tab: Int) {
@@ -41,12 +55,31 @@ class ConversationListViewModel @Inject constructor(
         else if (tab == 1) loadGroups()
     }
 
+    fun refreshAll() {
+        loadConversations()
+        loadGroups()
+        loadUnreadCount()
+    }
+
+    fun loadUnreadCount() {
+        viewModelScope.launch {
+            chatRepository.getChatUnreadCount().collect { result ->
+                if (result is Resource.Success) {
+                    _uiState.update { it.copy(totalUnreadCount = result.data) }
+                }
+            }
+        }
+    }
+
     fun loadConversations() {
         viewModelScope.launch {
             chatRepository.getConversations().collect { result ->
                 when (result) {
                     is Resource.Loading -> _uiState.update { it.copy(isLoading = true) }
-                    is Resource.Success -> _uiState.update { it.copy(conversations = result.data, isLoading = false) }
+                    is Resource.Success -> {
+                        _uiState.update { it.copy(conversations = result.data, isLoading = false) }
+                        loadUnreadCount()
+                    }
                     is Resource.Error -> _uiState.update { it.copy(isLoading = false, errorMessage = result.message) }
                 }
             }
@@ -58,9 +91,20 @@ class ConversationListViewModel @Inject constructor(
             chatRepository.getGroups().collect { result ->
                 when (result) {
                     is Resource.Loading -> _uiState.update { it.copy(isLoading = true) }
-                    is Resource.Success -> _uiState.update { it.copy(groups = result.data, isLoading = false) }
+                    is Resource.Success -> {
+                        _uiState.update { it.copy(groups = result.data, isLoading = false) }
+                        loadUnreadCount()
+                    }
                     is Resource.Error -> _uiState.update { it.copy(isLoading = false) }
                 }
+            }
+        }
+    }
+
+    private fun listenRealtime() {
+        viewModelScope.launch {
+            chatRepository.incomingRealtime.collect {
+                refreshAll()
             }
         }
     }

@@ -395,6 +395,7 @@ class ChatViewModel @Inject constructor(
                             )
                         }
                         _eventFlow.emit(ChatEvent.ScrollToBottom)
+                        chatRepository.markConversationRead(convId).collect {}
                     }
                     is Resource.Error -> {
                         loadGroupHistory()
@@ -420,6 +421,7 @@ class ChatViewModel @Inject constructor(
                         }
                         loadGroupCheckinStatus()
                         _eventFlow.emit(ChatEvent.ScrollToBottom)
+                        chatRepository.markGroupRead(convId).collect {}
                     }
                     is Resource.Error -> {
                         _uiState.update { it.copy(isLoading = false) }

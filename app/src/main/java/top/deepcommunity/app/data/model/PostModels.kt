@@ -307,8 +307,13 @@ data class NotificationDto(
 
 @Serializable
 data class UnreadCountDto(
+    @SerialName("unread_count")
+    val unreadCount: Int = 0,
     val count: Int = 0
-)
+) {
+    val effectiveCount: Int
+        get() = if (unreadCount > 0) unreadCount else count
+}
 
 @Serializable
 data class ReactionToggleRequest(

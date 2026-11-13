@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -148,11 +149,11 @@ fun HomeScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // 顶部 Header 状态（支持呼出侧边栏设置、一键打卡与搜索）
+        // 顶部 Header 状态（支持呼出侧边栏设置、搜索与全站榜单）
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .padding(horizontal = 14.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -164,7 +165,7 @@ fun HomeScreen(
                         tint = MaterialTheme.colorScheme.onBackground
                     )
                 }
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(2.dp))
                 Column(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
@@ -177,88 +178,65 @@ fun HomeScreen(
                         }
                         .padding(horizontal = 4.dp, vertical = 2.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "深度社区",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        // “推荐 / 关注” 专属动态流双 Tab
-                        Row(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(DeepTheme.extended.surfaceElevated)
-                                .border(0.8.dp, DeepTheme.extended.border, RoundedCornerShape(12.dp))
-                                .padding(2.dp)
-                        ) {
-                            val isRecommend = uiState.feedType == "recommend"
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isRecommend) MaterialTheme.colorScheme.primary else Color.Transparent)
-                                    .clickable {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        viewModel.selectFeedType("recommend")
-                                    }
-                                    .padding(horizontal = 8.dp, vertical = 3.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "推荐",
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isRecommend) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isRecommend) MaterialTheme.colorScheme.onPrimary else DeepTheme.extended.textTertiary
-                                )
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (!isRecommend) MaterialTheme.colorScheme.primary else Color.Transparent)
-                                    .clickable {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        viewModel.selectFeedType("following")
-                                    }
-                                    .padding(horizontal = 8.dp, vertical = 3.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "关注",
-                                    fontSize = 11.sp,
-                                    fontWeight = if (!isRecommend) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (!isRecommend) MaterialTheme.colorScheme.onPrimary else DeepTheme.extended.textTertiary
-                                )
-                            }
-                        }
-                        if (uiState.isLoading) {
-                            Spacer(modifier = Modifier.width(6.dp))
-                            CircularProgressIndicator(
-                                strokeWidth = 2.dp,
-                                modifier = Modifier.size(14.dp),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
                     Text(
-                        text = "记录日常 · 分享热爱 (点击刷新)",
-                        style = MaterialTheme.typography.labelSmall,
+                        text = "深度社区",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = "DEEP COMMUNITY",
+                        style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp),
                         color = DeepTheme.extended.textTertiary
                     )
                 }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // 榜单与打卡热力图轻量胶囊入口（帖子为重，抽屉唤起）
+            // 右侧功能操作区：搜索与榜单
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // 搜索按钮
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (uiState.isSearchActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                            else DeepTheme.extended.surfaceElevated
+                        )
+                        .border(
+                            0.8.dp,
+                            if (uiState.isSearchActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                            else DeepTheme.extended.border,
+                            CircleShape
+                        )
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            viewModel.toggleSearch()
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (uiState.isSearchActive) Icons.Default.Close else Icons.Outlined.Search,
+                        contentDescription = "搜索",
+                        tint = if (uiState.isSearchActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                // 榜单胶囊按钮
                 Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
-                        .border(1.dp, DeepTheme.extended.border, RoundedCornerShape(14.dp))
+                        .height(36.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(DeepTheme.extended.surfaceElevated)
+                        .border(0.8.dp, DeepTheme.extended.border, RoundedCornerShape(18.dp))
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             showLeaderboards = true
                         }
-                        .padding(horizontal = 9.dp, vertical = 6.dp),
+                        .padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -266,76 +244,101 @@ fun HomeScreen(
                         imageVector = Icons.Outlined.Leaderboard,
                         contentDescription = "全站榜单",
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(15.dp)
                     )
                     Text(
                         text = "榜单",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                 }
+            }
+        }
 
-                Spacer(modifier = Modifier.width(6.dp))
-
-                // ⚡ 一键打卡极客组件（未打卡高亮，已打卡显示翡翠绿“已打卡”，防止重复困惑）
-                val checkinGreen = Color(0xFF10B981)
+        // 次级功能栏：“推荐 / 关注” 专属动态流双 Tab 与刷新状态
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // “推荐 / 关注” 专属动态流双 Tab
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(DeepTheme.extended.surfaceElevated)
+                    .border(0.8.dp, DeepTheme.extended.border, RoundedCornerShape(14.dp))
+                    .padding(3.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val isRecommend = uiState.feedType == "recommend"
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(
-                            if (uiState.isCheckedIn) checkinGreen.copy(alpha = 0.12f)
-                            else MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-                        )
-                        .border(
-                            1.dp,
-                            if (uiState.isCheckedIn) checkinGreen.copy(alpha = 0.40f)
-                            else MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
-                            RoundedCornerShape(14.dp)
-                        )
+                        .clip(RoundedCornerShape(11.dp))
+                        .background(if (isRecommend) MaterialTheme.colorScheme.primary else Color.Transparent)
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            if (uiState.isCheckedIn) {
-                                Toast.makeText(context, "✓ 今日已打卡，明日再来获取经验吧~", Toast.LENGTH_SHORT).show()
-                            } else {
-                                viewModel.checkIn { success, msg ->
-                                    Toast.makeText(context, if (success) "⚡ 签到成功！经验 +5" else msg, Toast.LENGTH_SHORT).show()
-                                }
-                            }
+                            viewModel.selectFeedType("recommend")
                         }
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (uiState.isCheckingIn) {
-                        CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(13.dp), color = MaterialTheme.colorScheme.primary)
-                    } else {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = if (uiState.isCheckedIn) Icons.Default.Check else Icons.Default.Bolt,
-                                contentDescription = "一键打卡",
-                                tint = if (uiState.isCheckedIn) checkinGreen else MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Text(
-                                text = if (uiState.isCheckedIn) "已打卡" else "打卡",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (uiState.isCheckedIn) checkinGreen else MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(4.dp))
-
-                IconButton(onClick = viewModel::toggleSearch) {
-                    Icon(
-                        imageVector = if (uiState.isSearchActive) Icons.Default.Close else Icons.Outlined.Search,
-                        contentDescription = "搜索",
-                        tint = MaterialTheme.colorScheme.onBackground
+                    Text(
+                        text = "推荐",
+                        fontSize = 13.sp,
+                        fontWeight = if (isRecommend) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isRecommend) MaterialTheme.colorScheme.onPrimary else DeepTheme.extended.textSecondary
                     )
                 }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(11.dp))
+                        .background(if (!isRecommend) MaterialTheme.colorScheme.primary else Color.Transparent)
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            viewModel.selectFeedType("following")
+                        }
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "关注",
+                        fontSize = 13.sp,
+                        fontWeight = if (!isRecommend) FontWeight.Bold else FontWeight.Medium,
+                        color = if (!isRecommend) MaterialTheme.colorScheme.onPrimary else DeepTheme.extended.textSecondary
+                    )
+                }
+            }
+
+            // 刷新指示器 / 点击刷新
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        coroutineScope.launch {
+                            listState.animateScrollToItem(0)
+                            viewModel.loadPosts(isRefresh = true)
+                        }
+                    }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(13.dp),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                }
+                Text(
+                    text = if (uiState.isLoading) "刷新中…" else "点击刷新",
+                    fontSize = 11.sp,
+                    color = DeepTheme.extended.textTertiary
+                )
             }
         }
 

@@ -38,6 +38,7 @@ import top.deepcommunity.app.core.designsystem.component.CommunitySettingsDrawer
 import top.deepcommunity.app.core.designsystem.component.GlassFloatingNavigationBar
 import top.deepcommunity.app.core.designsystem.component.MainTab
 import top.deepcommunity.app.ui.chat.ConversationListScreen
+import top.deepcommunity.app.ui.chat.ConversationListViewModel
 import androidx.hilt.navigation.compose.hiltViewModel
 import top.deepcommunity.app.ui.home.HomeScreen
 import top.deepcommunity.app.ui.notification.NotificationScreen
@@ -61,12 +62,16 @@ fun MainScreen(
     val notificationViewModel: NotificationViewModel = hiltViewModel()
     val notificationUiState by notificationViewModel.uiState.collectAsState()
 
-    // 切换 Tab 时强制保证底部导航栏可见并即时刷新通知未读数据
+    val conversationViewModel: ConversationListViewModel = hiltViewModel()
+    val conversationUiState by conversationViewModel.uiState.collectAsState()
+
+    // 切换 Tab 时强制保证底部导航栏可见并即时刷新通知未读数据与会话未读
     LaunchedEffect(currentTab) {
         isBarVisible = true
         if (currentTab == MainTab.NOTIFICATION) {
             notificationViewModel.loadNotifications(isRefresh = true)
         }
+        conversationViewModel.refreshAll()
     }
 
     // 监听通知数量变化：当删除单条或清空通知后，无条件立即弹回底部导航栏，彻底修复消失卡死问题
@@ -147,7 +152,10 @@ fun MainScreen(
                         },
                         refreshTrigger = homeRefreshTrigger
                     )
-                    MainTab.CHAT -> ConversationListScreen(onConversationClick = onNavigateToChatDetail)
+                    MainTab.CHAT -> ConversationListScreen(
+                        onConversationClick = onNavigateToChatDetail,
+                        viewModel = conversationViewModel
+                    )
                     MainTab.CREATE -> {} // 浮动发帖按钮
                     MainTab.NOTIFICATION -> NotificationScreen(
                         viewModel = notificationViewModel,
@@ -178,6 +186,7 @@ fun MainScreen(
             GlassFloatingNavigationBar(
                 currentTab = currentTab,
                 isVisible = isBarVisible,
+                unreadMessageCount = conversationUiState.effectiveTotalUnread,
                 unreadNotificationCount = notificationUiState.unreadCount,
                 onTabSelected = { tab ->
                     if (tab != MainTab.CREATE) {

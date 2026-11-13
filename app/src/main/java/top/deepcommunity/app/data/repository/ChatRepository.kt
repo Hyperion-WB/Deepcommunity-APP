@@ -124,12 +124,34 @@ class ChatRepository @Inject constructor(
         }
     }.flowOn(Dispatchers.IO)
 
+    fun getChatUnreadCount(): Flow<Resource<Int>> = flow {
+        try {
+            val response = chatApi.getChatUnreadCount()
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!.effectiveCount))
+            } else {
+                emit(Resource.Error("获取未读数失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
     fun markConversationRead(convId: String): Flow<Resource<Unit>> = flow {
         try {
             chatApi.markConversationRead(convId)
             emit(Resource.Success(Unit))
         } catch (_: Exception) {
             emit(Resource.Error("标记失败"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun markGroupRead(roomId: String): Flow<Resource<Unit>> = flow {
+        try {
+            chatApi.markGroupRead(roomId)
+            emit(Resource.Success(Unit))
+        } catch (_: Exception) {
+            emit(Resource.Error("标记群已读失败"))
         }
     }.flowOn(Dispatchers.IO)
 

@@ -74,6 +74,9 @@ interface ChatApi {
         @Query("size") size: Int = 50
     ): Response<List<ChatMessageDto>>
 
+    @POST("api/chat/groups/{room_id}/read")
+    suspend fun markGroupRead(@Path("room_id") roomId: String): Response<MessageResponse>
+
     @POST("api/chat/groups/{room_id}/messages")
     suspend fun sendGroupMessage(
         @Path("room_id") roomId: String,

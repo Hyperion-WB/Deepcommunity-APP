@@ -100,6 +100,8 @@ fun ConversationListScreen(
         // 苹果风格 Segmented Pill 胶囊药丸切换条
         SegmentedCapsuleSwitcher(
             selectedTab = pagerState.currentPage,
+            privateUnread = uiState.privateUnreadCount,
+            groupUnread = uiState.groupUnreadCount,
             onTabSelected = { tab ->
                 coroutineScope.launch {
                     pagerState.animateScrollToPage(tab)
@@ -138,6 +140,8 @@ fun ConversationListScreen(
 private fun SegmentedCapsuleSwitcher(
     selectedTab: Int,
     onTabSelected: (Int) -> Unit,
+    privateUnread: Int = 0,
+    groupUnread: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val tabs = listOf("私聊会话", "社区群聊")
@@ -158,6 +162,7 @@ private fun SegmentedCapsuleSwitcher(
                 val isSelected = selectedTab == index
                 val bgColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
                 val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else DeepTheme.extended.textTertiary
+                val badgeCount = if (index == 0) privateUnread else groupUnread
 
                 Box(
                     modifier = Modifier
@@ -168,12 +173,34 @@ private fun SegmentedCapsuleSwitcher(
                         .padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = title,
-                        fontSize = 12.sp,
-                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                        color = textColor
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = title,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            color = textColor
+                        )
+                        if (badgeCount > 0) {
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(AccentError)
+                                    .padding(horizontal = 5.dp, vertical = 1.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (badgeCount > 99) "99+" else badgeCount.toString(),
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -434,13 +461,38 @@ private fun GroupItemCard(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            Text(
-                text = group.description ?: "极客交流专属群",
-                fontSize = 12.sp,
-                color = DeepTheme.extended.textTertiary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = group.description ?: "极客交流专属群",
+                    fontSize = 12.sp,
+                    color = DeepTheme.extended.textTertiary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+
+                if (group.unreadCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(AccentError),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (group.unreadCount > 99) ".." else group.unreadCount.toString(),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
         }
     }
 }
