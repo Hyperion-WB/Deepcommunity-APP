@@ -53,12 +53,19 @@ data class ChatUiState(
     val myRole: String? = null,
     val isLoadingGroupMembers: Boolean = false,
     val isRollingDice: Boolean = false,
-    val groupCheckinStatus: GroupCheckinStatusDto? = null
+    val groupCheckinStatus: GroupCheckinStatusDto? = null,
+    // 历史消息翻页与未读定位 (对齐 Web 端)
+    val unreadAtEntry: Int = 0,
+    val currentPage: Int = 1,
+    val hasMoreHistory: Boolean = true,
+    val isLoadingOlder: Boolean = false,
+    val isJumpingToUnread: Boolean = false
 )
 
 sealed interface ChatEvent {
     data class ShowToast(val message: String) : ChatEvent
     data object ScrollToBottom : ChatEvent
+    data class ScrollToIndex(val index: Int) : ChatEvent
 }
 
 @HiltViewModel
@@ -382,6 +389,7 @@ class ChatViewModel @Inject constructor(
 
     private fun loadHistory() {
         viewModelScope.launch {
+            checkUnreadForConversation()
             chatRepository.getMessages(convId).collect { result ->
                 when (result) {
                     is Resource.Loading -> _uiState.update { it.copy(isLoading = true) }
@@ -407,6 +415,7 @@ class ChatViewModel @Inject constructor(
 
     private fun loadGroupHistory() {
         viewModelScope.launch {
+            checkUnreadForGroup()
             chatRepository.getGroupMessages(convId).collect { result ->
                 when (result) {
                     is Resource.Loading -> {}
@@ -429,6 +438,111 @@ class ChatViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private fun checkUnreadForGroup() {
+        viewModelScope.launch {
+            chatRepository.getGroups().collect { res ->
+                if (res is Resource.Success) {
+                    val g = res.data.find { it.id == convId }
+                    if (g != null && g.unreadCount > 0 && _uiState.value.unreadAtEntry == 0) {
+                        _uiState.update { it.copy(unreadAtEntry = g.unreadCount) }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun checkUnreadForConversation() {
+        viewModelScope.launch {
+            chatRepository.getConversations().collect { res ->
+                if (res is Resource.Success) {
+                    val c = res.data.find { it.id == convId }
+                    if (c != null && c.unreadCount > 0 && _uiState.value.unreadAtEntry == 0) {
+                        _uiState.update { it.copy(unreadAtEntry = c.unreadCount) }
+                    }
+                }
+            }
+        }
+    }
+
+    // 往上滑动翻页加载更早的历史聊天记录 (对齐 Web 端)
+    fun loadOlderHistory() {
+        val state = _uiState.value
+        if (state.isLoadingOlder || !state.hasMoreHistory) return
+
+        val nextPage = state.currentPage + 1
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingOlder = true) }
+            val flow = if (state.isGroupChat) {
+                chatRepository.getGroupMessages(convId, page = nextPage)
+            } else {
+                chatRepository.getMessages(convId, page = nextPage)
+            }
+            flow.collect { result ->
+                when (result) {
+                    is Resource.Success -> {
+                        val older = result.data
+                        if (older.isEmpty()) {
+                            _uiState.update { it.copy(hasMoreHistory = false, isLoadingOlder = false) }
+                        } else {
+                            val currentIds = state.messages.map { it.id }.toSet()
+                            val newOlder = older.filter { it.id !in currentIds }
+                            _uiState.update { current ->
+                                current.copy(
+                                    messages = newOlder + current.messages,
+                                    currentPage = nextPage,
+                                    hasMoreHistory = older.size >= 50,
+                                    isLoadingOlder = false
+                                )
+                            }
+                        }
+                    }
+                    is Resource.Error -> {
+                        _uiState.update { it.copy(isLoadingOlder = false) }
+                    }
+                    else -> {}
+                }
+            }
+        }
+    }
+
+    // 定位到未读消息位置 (对齐 Web 端 jumpToUnread)
+    fun jumpToUnread() {
+        val state = _uiState.value
+        val unread = state.unreadAtEntry
+        if (unread <= 0 || state.isJumpingToUnread) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isJumpingToUnread = true) }
+            val pagesNeeded = Math.min(6, Math.max(1, (unread + 49) / 50))
+            var curPage = state.currentPage
+            while (curPage < pagesNeeded && _uiState.value.hasMoreHistory) {
+                val nextPage = curPage + 1
+                val res = if (state.isGroupChat) {
+                    chatRepository.getGroupMessages(convId, page = nextPage)
+                } else {
+                    chatRepository.getMessages(convId, page = nextPage)
+                }
+                res.collect { r ->
+                    if (r is Resource.Success && r.data.isNotEmpty()) {
+                        val currentIds = _uiState.value.messages.map { it.id }.toSet()
+                        val newOlder = r.data.filter { it.id !in currentIds }
+                        _uiState.update { it.copy(messages = newOlder + it.messages, currentPage = nextPage) }
+                    }
+                }
+                curPage = nextPage
+            }
+
+            val allMsgs = _uiState.value.messages
+            val targetIndex = Math.max(0, allMsgs.size - unread)
+            _uiState.update { it.copy(isJumpingToUnread = false, unreadAtEntry = 0) }
+            _eventFlow.emit(ChatEvent.ScrollToIndex(targetIndex))
+        }
+    }
+
+    fun dismissUnreadBanner() {
+        _uiState.update { it.copy(unreadAtEntry = 0) }
     }
 
     private fun listenRealtime() {

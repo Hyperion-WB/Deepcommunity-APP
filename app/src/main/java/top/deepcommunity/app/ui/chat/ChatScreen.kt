@@ -15,11 +15,15 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.material.icons.outlined.ArrowDownward
+import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -181,14 +185,31 @@ fun ChatScreen(
                         listState.animateScrollToItem(uiState.messages.size - 1)
                     }
                 }
+                is ChatEvent.ScrollToIndex -> {
+                    if (event.index in uiState.messages.indices) {
+                        listState.animateScrollToItem(event.index)
+                    }
+                }
             }
         }
     }
 
-    // 默认打开时/加载完成时立即精准定位到最新消息底部
-    LaunchedEffect(uiState.messages.size, uiState.isLoading) {
-        if (uiState.messages.isNotEmpty()) {
+    // 默认打开时/加载完成时立即精准定位到最新消息底部（若正在定位未读则不抢焦）
+    LaunchedEffect(uiState.isLoading) {
+        if (!uiState.isLoading && uiState.messages.isNotEmpty() && uiState.unreadAtEntry == 0) {
             listState.scrollToItem(uiState.messages.size - 1)
+        }
+    }
+
+    // 往上滑动自动触发加载更早历史消息
+    val shouldLoadOlder by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex <= 1 && !uiState.isLoading && !uiState.isLoadingOlder && uiState.hasMoreHistory && uiState.messages.isNotEmpty()
+        }
+    }
+    LaunchedEffect(shouldLoadOlder) {
+        if (shouldLoadOlder) {
+            viewModel.loadOlderHistory()
         }
     }
 
@@ -464,58 +485,208 @@ fun ChatScreen(
             }
         }
     ) { paddingValues ->
-        LazyColumn(
-            state = listState,
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(paddingValues)
         ) {
-            items(uiState.messages, key = { it.id }) { msg ->
-                val isMe = msg.senderId == uiState.currentUserId
-                ChatMessageBubble(
-                    message = msg,
-                    isMe = isMe,
-                    isGroup = uiState.isGroupChat,
-                    isHighlighted = (msg.id == highlightedMsgId),
-                    onAvatarLongClick = {
-                        // 长按头像快捷 @该成员（优先取系统的唯一用户名 username，绝不显示长串 UUID）
-                        val atUsername = msg.senderUsername?.takeIf { it.isNotBlank() }
-                            ?: msg.sender?.username?.takeIf { it.isNotBlank() }
-                            ?: msg.displayName.takeIf { it.isNotBlank() && it != "用户" }
-                            ?: "居民"
-                        viewModel.appendText("@$atUsername ")
-                    },
-                    onQuoteClick = { replyId ->
-                        val targetIndex = uiState.messages.indexOfFirst { it.id == replyId }
-                        if (targetIndex != -1) {
-                            scope.launch {
-                                listState.animateScrollToItem(targetIndex)
-                                highlightedMsgId = replyId
-                                delay(1500)
-                                highlightedMsgId = null
-                            }
-                        } else {
-                            scope.launch {
-                                snackbarHostState.showSnackbar("被回复的消息较早，请向上滑动查看")
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // 顶部历史消息加载指示器 / 按钮 (对齐 Web 端)
+                if (uiState.isLoadingOlder) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(16.dp),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "正在加载更早的消息…",
+                                    fontSize = 12.sp,
+                                    color = DeepTheme.extended.textTertiary
+                                )
                             }
                         }
-                    },
-                    onReplyClick = { viewModel.setReplyMessage(msg) },
-                    onRecallClick = { viewModel.recallMessage(msg) },
-                    onCopyClick = {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("chat_msg", msg.content))
-                        scope.launch { snackbarHostState.showSnackbar("已复制到剪贴板") }
-                    },
-                    onImageClick = { previewChatImageUrl = it },
-                    onCollectSticker = viewModel::collectSticker,
-                    onUserClick = { uName, uId ->
-                        selectedChatUsername = uName
-                        selectedChatUserId = uId
                     }
-                )
+                } else if (uiState.hasMoreHistory && uiState.messages.isNotEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "加载更早的消息",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                                    .border(0.8.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                                    .clickable { viewModel.loadOlderHistory() }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+
+                items(uiState.messages, key = { it.id }) { msg ->
+                    val isMe = msg.senderId == uiState.currentUserId
+                    ChatMessageBubble(
+                        message = msg,
+                        isMe = isMe,
+                        isGroup = uiState.isGroupChat,
+                        isHighlighted = (msg.id == highlightedMsgId),
+                        onAvatarLongClick = {
+                            // 长按头像快捷 @该成员（优先取系统的唯一用户名 username，绝不显示长串 UUID）
+                            val atUsername = msg.senderUsername?.takeIf { it.isNotBlank() }
+                                ?: msg.sender?.username?.takeIf { it.isNotBlank() }
+                                ?: msg.displayName.takeIf { it.isNotBlank() && it != "用户" }
+                                ?: "居民"
+                            viewModel.appendText("@$atUsername ")
+                        },
+                        onQuoteClick = { replyId ->
+                            val targetIndex = uiState.messages.indexOfFirst { it.id == replyId }
+                            if (targetIndex != -1) {
+                                scope.launch {
+                                    listState.animateScrollToItem(targetIndex)
+                                    highlightedMsgId = replyId
+                                    delay(1500)
+                                    highlightedMsgId = null
+                                }
+                            } else {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("被回复的消息较早，请向上滑动查看")
+                                }
+                            }
+                        },
+                        onReplyClick = { viewModel.setReplyMessage(msg) },
+                        onRecallClick = { viewModel.recallMessage(msg) },
+                        onCopyClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("chat_msg", msg.content))
+                            scope.launch { snackbarHostState.showSnackbar("已复制到剪贴板") }
+                        },
+                        onImageClick = { previewChatImageUrl = it },
+                        onCollectSticker = viewModel::collectSticker,
+                        onUserClick = { uName, uId ->
+                            selectedChatUsername = uName
+                            selectedChatUserId = uId
+                        }
+                    )
+                }
+            }
+
+            // 顶部未读定位悬浮胶囊 (对齐 Web 端 jumpToUnread)
+            AnimatedVisibility(
+                visible = uiState.unreadAtEntry > 0,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 8.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .shadow(8.dp, RoundedCornerShape(20.dp), spotColor = Color.Black.copy(alpha = 0.25f))
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.primary)
+                        .clickable { viewModel.jumpToUnread() }
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.ArrowUpward,
+                        contentDescription = "定位到未读",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (uiState.isJumpingToUnread) "正在加载未读消息…" else "${uiState.unreadAtEntry} 条未读 · 回到上次位置",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.2f))
+                            .clickable { viewModel.dismissUnreadBanner() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "关闭提示",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+                }
+            }
+
+            // 右下角回到最新悬浮按钮
+            val showScrollToBottom by remember {
+                derivedStateOf {
+                    val total = listState.layoutInfo.totalItemsCount
+                    val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                    total > 8 && lastVisible < total - 3
+                }
+            }
+
+            AnimatedVisibility(
+                visible = showScrollToBottom,
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut() + scaleOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 16.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .shadow(6.dp, RoundedCornerShape(18.dp), spotColor = Color.Black.copy(alpha = 0.2f))
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(DeepTheme.extended.surfaceElevated)
+                        .border(0.8.dp, DeepTheme.extended.border, RoundedCornerShape(18.dp))
+                        .clickable {
+                            scope.launch {
+                                if (uiState.messages.isNotEmpty()) {
+                                    listState.animateScrollToItem(uiState.messages.size - 1)
+                                }
+                            }
+                        }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.ArrowDownward,
+                        contentDescription = "回到最新",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "回到最新",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
         }
 

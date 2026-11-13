@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "深度社区鸿蒙原生模块"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "深度社区原生入口"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "深度社区"
+    }
+  ]
+}
