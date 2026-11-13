@@ -62,13 +62,19 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Undo
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Casino
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Mood
+import androidx.compose.material.icons.outlined.Translate
+import androidx.compose.ui.graphics.vector.ImageVector
+import top.deepcommunity.app.ui.chat.component.DiceCube
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -324,7 +330,7 @@ fun ChatScreen(
                     }
                 }
 
-                // 群互动快捷胶囊条 (群聊专属轻量高频互动)
+                // 群互动快捷胶囊条 (群聊专属轻量高频互动，无幼稚emoji)
                 if (uiState.isGroupChat) {
                     Row(
                         modifier = Modifier
@@ -334,18 +340,18 @@ fun ChatScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         GroupActionChip(
-                            icon = "🎲",
+                            icon = Icons.Outlined.Casino,
                             label = "掷骰子",
                             loading = uiState.isRollingDice,
                             onClick = { viewModel.rollDice() }
                         )
                         GroupActionChip(
-                            icon = "🥠",
+                            icon = Icons.Outlined.AutoAwesome,
                             label = "每日求签",
                             onClick = { showDailyFortuneDialog = true }
                         )
                         GroupActionChip(
-                            icon = "🐉",
+                            icon = Icons.Outlined.Translate,
                             label = "成语接龙",
                             onClick = { showIdiomChainSheet = true }
                         )
@@ -612,7 +618,7 @@ fun ChatScreen(
 
 @Composable
 private fun GroupActionChip(
-    icon: String,
+    icon: ImageVector,
     label: String,
     loading: Boolean = false,
     onClick: () -> Unit
@@ -625,7 +631,7 @@ private fun GroupActionChip(
             .clickable(enabled = !loading, onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
     ) {
         if (loading) {
             CircularProgressIndicator(
@@ -634,12 +640,17 @@ private fun GroupActionChip(
                 color = MaterialTheme.colorScheme.primary
             )
         } else {
-            Text(text = icon, fontSize = 12.sp)
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(13.dp)
+            )
         }
         Text(
             text = label,
             fontSize = 11.sp,
-            color = DeepTheme.extended.textSecondary,
+            color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.Medium
         )
     }
@@ -971,24 +982,29 @@ private fun ChatMessageBubble(
                         Spacer(modifier = Modifier.height(4.dp))
                     }
 
-                    // 1. 摇骰子结果卡片
+                    // 1. 摇骰子结果卡片（物理 3D 滚动动画与象牙骨质感）
                     if (parsed.isDice) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(vertical = 4.dp, horizontal = 2.dp)
                         ) {
-                            Text(text = "🎲", fontSize = 28.sp)
-                            Spacer(modifier = Modifier.width(8.dp))
+                            DiceCube(
+                                value = parsed.dicePoints ?: 1,
+                                size = 48.dp,
+                                animate = true
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = "掷出了 ${parsed.dicePoints} 点",
-                                    fontSize = 14.sp,
+                                    text = "掷出 ${parsed.dicePoints ?: 1} 点",
+                                    fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                                 )
+                                Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "服务端生成 · 真实防作弊",
-                                    fontSize = 9.sp,
+                                    text = "服务端随机下发 · 点击可重掷",
+                                    fontSize = 10.sp,
                                     color = if (isMe) Color.White.copy(alpha = 0.7f) else DeepTheme.extended.textTertiary
                                 )
                             }
@@ -999,8 +1015,13 @@ private fun ChatMessageBubble(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(vertical = 4.dp, horizontal = 2.dp)
                         ) {
-                            Text(text = "✅", fontSize = 20.sp)
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(
                                     text = "每日签到 · ${parsed.pureText}",
@@ -1373,7 +1394,7 @@ private fun GroupInfoSheetContent(
         }
 
         Text(
-            text = "💡 提示：长按头像才能 @ 对方",
+            text = "提示：长按头像可快捷 @ 对方",
             fontSize = 11.sp,
             color = DeepTheme.extended.textTertiary,
             modifier = Modifier.padding(top = 2.dp)

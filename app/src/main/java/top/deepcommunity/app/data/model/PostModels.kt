@@ -37,12 +37,16 @@ data class PostItemDto(
     @SerialName("cover_image")
     val coverImage: String? = null,
     @SerialName("image_urls")
-    val imageUrls: List<String> = emptyList(),
+    val imageUrls: List<String>? = null,
+    @SerialName("display_image")
+    val displayImage: String? = null,
     val tags: List<String> = emptyList(),
     @SerialName("category_id")
     val categoryId: Int? = null,
+    @SerialName("category_name")
+    val categoryName: String? = null,
     @SerialName("author_id")
-    val authorId: Long? = null,
+    val authorId: String? = null,
     val author: PostAuthorDto? = null,
     @SerialName("author_username")
     val authorUsername: String? = null,
@@ -60,6 +64,12 @@ data class PostItemDto(
     val likeCount: Int = 0,
     @SerialName("comment_count")
     val commentCount: Int = 0,
+    @SerialName("is_pinned")
+    val isPinned: Boolean = false,
+    @SerialName("is_essence")
+    val isEssence: Boolean = false,
+    @SerialName("post_type")
+    val postType: String = "post",
     @SerialName("is_liked")
     val isLiked: Boolean = false,
     @SerialName("is_collected")
@@ -74,8 +84,11 @@ data class PostItemDto(
             ?: authorAvatarUrl?.takeIf { it.isNotBlank() }
             ?: author?.avatarUrl
 
-    val effectiveAuthorId: Long?
-        get() = authorId ?: author?.id?.toLongOrNull()
+    val effectiveAuthorId: String?
+        get() = authorId ?: author?.id
+
+    val effectiveAuthorUsername: String?
+        get() = authorUsername?.takeIf { it.isNotBlank() } ?: author?.username
 }
 
 @Serializable
@@ -210,7 +223,7 @@ data class CommentDto(
     @SerialName("is_liked")
     val isLiked: Boolean = false,
     @SerialName("author_id")
-    val authorId: Long? = null,
+    val authorId: String? = null,
     @SerialName("is_accepted")
     val isAccepted: Boolean = false,
     @SerialName("is_featured")
@@ -226,8 +239,11 @@ data class CommentDto(
     val displayAuthorAvatar: String?
         get() = if (isAnonymous) null else (authorAvatar ?: author?.avatarUrl)
 
-    val effectiveAuthorId: Long?
-        get() = authorId ?: author?.id?.toLongOrNull()
+    val effectiveAuthorId: String?
+        get() = authorId ?: author?.id
+
+    val effectiveAuthorUsername: String?
+        get() = authorUsername?.takeIf { it.isNotBlank() } ?: author?.username
 }
 
 @Serializable

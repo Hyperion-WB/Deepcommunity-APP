@@ -117,7 +117,8 @@ fun PostDetailScreen(
     var showSharePosterDialog by remember { mutableStateOf(false) }
     var showReportPostDialog by remember { mutableStateOf(false) }
     var reportCommentTarget by remember { mutableStateOf<Pair<String, String>?>(null) } // id to content
-    var selectedUserId by remember { mutableStateOf<Long?>(null) }
+    var selectedUserId by remember { mutableStateOf<String?>(null) }
+    var selectedUsername by remember { mutableStateOf<String?>(null) }
 
     // 评论区相册选图上传
     val commentImagePickerLauncher = rememberLauncherForActivityResult(
@@ -414,7 +415,8 @@ fun PostDetailScreen(
                                             interactionSource = postAvatarInteractionSource,
                                             indication = null,
                                             onClick = {
-                                                post.effectiveAuthorId?.let { selectedUserId = it }
+                                                selectedUsername = post.effectiveAuthorUsername
+                                                selectedUserId = post.effectiveAuthorId
                                             },
                                             onLongClick = {
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -436,7 +438,8 @@ fun PostDetailScreen(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null
                                     ) {
-                                        post.effectiveAuthorId?.let { selectedUserId = it }
+                                        selectedUsername = post.effectiveAuthorUsername
+                                        selectedUserId = post.effectiveAuthorId
                                     }
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -648,7 +651,10 @@ fun PostDetailScreen(
                             onAvatarLongClick = { username ->
                                 viewModel.appendText("@$username ")
                             },
-                            onUserClick = { uId -> selectedUserId = uId },
+                            onUserClick = { uName, uId ->
+                                selectedUsername = uName
+                                selectedUserId = uId
+                            },
                             onAcceptClick = { cId -> viewModel.acceptComment(cId) },
                             onFeatureClick = { cId -> viewModel.featureComment(cId) },
                             onReportClick = { cId, cText -> reportCommentTarget = cId to cText }
@@ -697,11 +703,15 @@ fun PostDetailScreen(
         }
 
         // 他人个人主页
-        selectedUserId?.let { uId ->
+        (selectedUsername ?: selectedUserId)?.let { _ ->
             UserProfileBottomSheet(
-                userId = uId,
+                username = selectedUsername,
+                userId = selectedUserId,
                 userRepository = viewModel.userRepo,
-                onDismissRequest = { selectedUserId = null }
+                onDismissRequest = {
+                    selectedUserId = null
+                    selectedUsername = null
+                }
             )
         }
     }
@@ -715,9 +725,9 @@ private fun CommentItem(
     onCommentLikeClick: (String) -> Unit,
     onImageClick: (String) -> Unit,
     onAvatarLongClick: (String) -> Unit,
-    onUserClick: (Long) -> Unit,
-    onAcceptClick: (Long) -> Unit,
-    onFeatureClick: (Long) -> Unit,
+    onUserClick: (username: String?, userId: String?) -> Unit,
+    onAcceptClick: (String) -> Unit,
+    onFeatureClick: (String) -> Unit,
     onReportClick: (String, String) -> Unit
 ) {
     var isRepliesExpanded by remember { mutableStateOf(false) }
@@ -752,7 +762,7 @@ private fun CommentItem(
                         interactionSource = avatarInteractionSource,
                         indication = null,
                         onClick = {
-                            comment.effectiveAuthorId?.let(onUserClick)
+                            onUserClick(comment.effectiveAuthorUsername, comment.effectiveAuthorId)
                         },
                         onLongClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -786,7 +796,7 @@ private fun CommentItem(
                                 .padding(horizontal = 4.dp, vertical = 1.dp)
                         ) {
                             Text(
-                                text = "👑 最佳采纳",
+                                text = "最佳采纳",
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFFFF8F00)
@@ -802,7 +812,7 @@ private fun CommentItem(
                                 .padding(horizontal = 4.dp, vertical = 1.dp)
                         ) {
                             Text(
-                                text = "📌 作者置顶",
+                                text = "精选置顶",
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF8E24AA)
@@ -881,23 +891,22 @@ private fun CommentItem(
                     expanded = isMenuExpanded,
                     onDismissRequest = { isMenuExpanded = false }
                 ) {
-                    val cIdLong = comment.id.toLongOrNull() ?: 0L
                     DropdownMenuItem(
-                        text = { Text("👑 采纳为最佳答案", fontSize = 12.sp) },
+                        text = { Text("设为最佳答案", fontSize = 12.sp) },
                         onClick = {
                             isMenuExpanded = false
-                            onAcceptClick(cIdLong)
+                            onAcceptClick(comment.id)
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("📌 精选置顶该评论", fontSize = 12.sp) },
+                        text = { Text("精选置顶该评论", fontSize = 12.sp) },
                         onClick = {
                             isMenuExpanded = false
-                            onFeatureClick(cIdLong)
+                            onFeatureClick(comment.id)
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("🚩 举报违规评论", fontSize = 12.sp) },
+                        text = { Text("举报违规评论", fontSize = 12.sp) },
                         onClick = {
                             isMenuExpanded = false
                             onReportClick(comment.id, comment.content)

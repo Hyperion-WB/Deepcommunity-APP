@@ -88,7 +88,7 @@ fun DailyFortuneDialog(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "🥠 每日求签",
+                text = "每日求签",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground
@@ -205,8 +205,22 @@ fun DailyFortuneDialog(
                         )
                     } else {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(text = "🎋", fontSize = 42.sp)
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
+                                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "签",
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
                             Text(
                                 text = "诚心摇动灵签，测测今日社区运势吧",
                                 fontSize = 12.sp,

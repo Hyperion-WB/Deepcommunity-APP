@@ -21,8 +21,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Tab
@@ -64,7 +67,7 @@ fun LeaderboardsBottomSheet(
     postRepository: PostRepository,
     userRepository: UserRepository,
     onDismissRequest: () -> Unit,
-    onUserClick: (Long) -> Unit
+    onUserClick: (String) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
@@ -141,8 +144,15 @@ fun LeaderboardsBottomSheet(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Outlined.CalendarMonth,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "📅 签到热力图",
+                                text = "签到热力图",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onBackground
@@ -236,17 +246,17 @@ fun LeaderboardsBottomSheet(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("🔥 连续签到", fontSize = 13.sp, fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal) }
+                    text = { Text("连续签到", fontSize = 13.sp, fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal) }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("⚡ 抢早签榜", fontSize = 13.sp, fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal) }
+                    text = { Text("抢早榜", fontSize = 13.sp, fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal) }
                 )
                 Tab(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
-                    text = { Text("🌟 7日活跃", fontSize = 13.sp, fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal) }
+                    text = { Text("7日活跃", fontSize = 13.sp, fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal) }
                 )
             }
 
@@ -292,29 +302,35 @@ fun LeaderboardsBottomSheet(
                         itemsIndexed(currentList, key = { _, item -> item.userId }) { index, item ->
                             val rank = item.rank.takeIf { it > 0 } ?: (index + 1)
                             val displayName = item.nickname ?: item.username.ifBlank { "居民" }
+                            val targetIdentifier = item.username.ifBlank { item.userId }
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { onUserClick(item.userId.toLongOrNull() ?: 0L) }
+                                    .clickable { onUserClick(targetIdentifier) }
                                     .padding(horizontal = 16.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // 排名徽章
+                                // 现代金属色排名圆形徽章 (无幼稚emoji)
                                 Box(
-                                    modifier = Modifier.size(28.dp),
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            when (rank) {
+                                                1 -> Color(0xFFE5B842)
+                                                2 -> Color(0xFF9EACB8)
+                                                3 -> Color(0xFFCD7F32)
+                                                else -> Color.Transparent
+                                            }
+                                        ),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    when (rank) {
-                                        1 -> Text("🥇", fontSize = 18.sp)
-                                        2 -> Text("🥈", fontSize = 18.sp)
-                                        3 -> Text("🥉", fontSize = 18.sp)
-                                        else -> Text(
-                                            text = "$rank",
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = extColors.textTertiary
-                                        )
-                                    }
+                                    Text(
+                                        text = "$rank",
+                                        fontSize = if (rank <= 3) 12.sp else 13.sp,
+                                        fontWeight = if (rank <= 3) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (rank <= 3) Color(0xFF141414) else extColors.textTertiary
+                                    )
                                 }
 
                                 Spacer(modifier = Modifier.width(10.dp))

@@ -463,12 +463,12 @@ class PostDetailViewModel @Inject constructor(
         }
     }
 
-    fun acceptComment(commentId: Long) {
+    fun acceptComment(commentId: String) {
         viewModelScope.launch {
-            postRepository.acceptComment(commentId.toString()).collect { res ->
+            postRepository.acceptComment(commentId).collect { res ->
                 when (res) {
                     is Resource.Success -> {
-                        _eventFlow.emit(PostDetailEvent.ShowToast("👑 已采纳该回答为最佳答案"))
+                        _eventFlow.emit(PostDetailEvent.ShowToast("已采纳该回答为最佳答案"))
                         loadComments()
                         loadQaState()
                     }
@@ -481,12 +481,12 @@ class PostDetailViewModel @Inject constructor(
         }
     }
 
-    fun featureComment(commentId: Long) {
+    fun featureComment(commentId: String) {
         viewModelScope.launch {
-            postRepository.featureComment(commentId.toString()).collect { res ->
+            postRepository.featureComment(commentId).collect { res ->
                 when (res) {
                     is Resource.Success -> {
-                        _eventFlow.emit(PostDetailEvent.ShowToast("📌 已精选置顶该评论"))
+                        _eventFlow.emit(PostDetailEvent.ShowToast("已精选置顶该评论"))
                         loadComments()
                     }
                     is Resource.Error -> {

@@ -41,10 +41,13 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.Article
+import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Leaderboard
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.Visibility
@@ -114,7 +117,8 @@ fun HomeScreen(
     val coroutineScope = rememberCoroutineScope()
     var previewImageUrl by remember { mutableStateOf<String?>(null) }
     var showLeaderboards by remember { mutableStateOf(false) }
-    var selectedAuthorId by remember { mutableStateOf<Long?>(null) }
+    var selectedAuthorId by remember { mutableStateOf<String?>(null) }
+    var selectedAuthorUsername by remember { mutableStateOf<String?>(null) }
 
     // 监听外部刷新触发（如底栏主页按钮点击）
     LaunchedEffect(refreshTrigger) {
@@ -244,8 +248,8 @@ fun HomeScreen(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // 🏆 榜单与打卡热力图轻量胶囊入口（帖子为重，抽屉唤起）
-                Box(
+                // 榜单与打卡热力图轻量胶囊入口（帖子为重，抽屉唤起）
+                Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(14.dp))
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
@@ -254,11 +258,18 @@ fun HomeScreen(
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             showLeaderboards = true
                         }
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(horizontal = 9.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Leaderboard,
+                        contentDescription = "全站榜单",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
                     Text(
-                        text = "🏆 榜单",
+                        text = "榜单",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary
@@ -449,7 +460,12 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "📢", fontSize = 13.sp)
+                    Icon(
+                        imageVector = Icons.Outlined.Campaign,
+                        contentDescription = "系统公告",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(15.dp)
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = ann.content,
@@ -503,14 +519,56 @@ fun HomeScreen(
                 contentPadding = PaddingValues(bottom = 100.dp, start = 16.dp, end = 16.dp, top = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                items(uiState.posts, key = { it.id }) { post ->
-                    PostCard(
-                        post = post,
-                        onClick = { onPostClick(post.id) },
-                        onLikeClick = { viewModel.toggleLike(post.id) },
-                        onImageClick = { previewImageUrl = it },
-                        onAuthorClick = { authorId -> selectedAuthorId = authorId }
-                    )
+                if (uiState.posts.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 60.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Article,
+                                    contentDescription = null,
+                                    tint = DeepTheme.extended.textTertiary,
+                                    modifier = Modifier.size(44.dp)
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = uiState.errorMessage ?: "暂无相关帖子",
+                                    fontSize = 13.sp,
+                                    color = DeepTheme.extended.textTertiary
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "刷新重试",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                                        .border(0.8.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
+                                        .clickable { viewModel.loadPosts(isRefresh = true) }
+                                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    items(uiState.posts, key = { it.id }) { post ->
+                        PostCard(
+                            post = post,
+                            onClick = { onPostClick(post.id) },
+                            onLikeClick = { viewModel.toggleLike(post.id) },
+                            onImageClick = { previewImageUrl = it },
+                            onAuthorClick = { uName, uId ->
+                                selectedAuthorUsername = uName
+                                selectedAuthorId = uId
+                            }
+                        )
+                    }
                 }
 
                 if (uiState.isLoadingMore) {
@@ -553,25 +611,29 @@ fun HomeScreen(
             onDismissRequest = { previewImageUrl = null }
         )
 
-        // 🏆 全站排行榜与打卡绿格子热力图半屏抽屉（帖子为重，抽屉唤起）
+        // 全站排行榜与打卡绿格子热力图半屏抽屉（帖子为重，抽屉唤起）
         if (showLeaderboards) {
             LeaderboardsBottomSheet(
                 postRepository = viewModel.postRepo,
                 userRepository = viewModel.userRepo,
                 onDismissRequest = { showLeaderboards = false },
-                onUserClick = { uId ->
+                onUserClick = { userIdent ->
                     showLeaderboards = false
-                    selectedAuthorId = uId
+                    selectedAuthorUsername = userIdent
                 }
             )
         }
 
-        // 👤 他人个人主页半屏弹窗
-        selectedAuthorId?.let { authorId ->
+        // 他人个人主页半屏弹窗
+        (selectedAuthorUsername ?: selectedAuthorId)?.let { ident ->
             UserProfileBottomSheet(
-                userId = authorId,
+                username = selectedAuthorUsername,
+                userId = selectedAuthorId,
                 userRepository = viewModel.userRepo,
-                onDismissRequest = { selectedAuthorId = null }
+                onDismissRequest = {
+                    selectedAuthorId = null
+                    selectedAuthorUsername = null
+                }
             )
         }
     }
@@ -728,7 +790,7 @@ fun PostCard(
     onClick: () -> Unit,
     onLikeClick: () -> Unit,
     onImageClick: (String) -> Unit = {},
-    onAuthorClick: ((Long) -> Unit)? = null,
+    onAuthorClick: ((username: String?, authorId: String?) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -783,8 +845,8 @@ fun PostCard(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(enabled = onAuthorClick != null && post.effectiveAuthorId != null) {
-                        post.effectiveAuthorId?.let { onAuthorClick?.invoke(it) }
+                    .clickable(enabled = onAuthorClick != null) {
+                        onAuthorClick?.invoke(post.effectiveAuthorUsername, post.effectiveAuthorId)
                     }
             ) {
                 val authorName = post.authorNickname ?: post.authorUsername ?: post.author?.nickname ?: "居民"
@@ -827,7 +889,65 @@ fun PostCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // 置顶 / 精选 / 分类标识行
+            val hasBadge = post.isPinned || post.isEssence || !post.categoryName.isNullOrBlank()
+            if (hasBadge) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (post.isPinned) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                                .padding(horizontal = 5.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "置顶",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+                    if (post.isEssence) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0xFFE5B842).copy(alpha = 0.16f))
+                                .padding(horizontal = 5.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "精选",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFD97706)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+                    if (!post.categoryName.isNullOrBlank()) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(DeepTheme.extended.surfaceElevated)
+                                .border(0.6.dp, DeepTheme.extended.border, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = post.categoryName!!,
+                                fontSize = 10.sp,
+                                color = DeepTheme.extended.textSecondary
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+            }
 
             // 帖子标题
             Text(
@@ -853,12 +973,26 @@ fun PostCard(
                 )
             }
 
-            // 九宫格相册网格（支持点击大图预览）
-            if (post.imageUrls.isNotEmpty()) {
+            // 九宫格相册网格或单图封面（支持点击大图预览）
+            val singleImg = post.coverImage?.takeIf { it.isNotBlank() } ?: post.displayImage?.takeIf { it.isNotBlank() }
+            if (!post.imageUrls.isNullOrEmpty()) {
                 Spacer(modifier = Modifier.height(10.dp))
                 PostImageGrid(
-                    images = post.imageUrls,
+                    images = post.imageUrls!!,
                     onImageClick = onImageClick
+                )
+            } else if (singleImg != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                val fullUrl = if (singleImg.startsWith("http")) singleImg else Constants.BASE_URL.removeSuffix("/") + if (singleImg.startsWith("/")) singleImg else "/$singleImg"
+                AsyncImage(
+                    model = fullUrl,
+                    contentDescription = "封面图",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { onImageClick(fullUrl) },
+                    contentScale = ContentScale.Crop
                 )
             }
 

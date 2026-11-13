@@ -60,12 +60,12 @@ import top.deepcommunity.app.data.repository.UserRepository
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserProfileBottomSheet(
-    userId: Long = 0L,
+    userId: String? = null,
     username: String? = null,
     userRepository: UserRepository,
     onDismissRequest: () -> Unit,
-    onNavigateToChat: ((targetUserId: Long, targetUserName: String) -> Unit)? = null,
-    onReportUser: ((targetUserId: Long, userName: String) -> Unit)? = null
+    onNavigateToChat: ((targetUserId: String, targetUserName: String) -> Unit)? = null,
+    onReportUser: ((targetUserId: String, userName: String) -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
@@ -73,7 +73,7 @@ fun UserProfileBottomSheet(
     val extColors = LocalExtendedColors.current
 
     val identifier = remember(userId, username) {
-        username?.takeIf { it.isNotBlank() } ?: userId.toString()
+        username?.takeIf { it.isNotBlank() } ?: userId?.takeIf { it.isNotBlank() } ?: ""
     }
 
     var isLoading by remember { mutableStateOf(true) }
@@ -129,7 +129,8 @@ fun UserProfileBottomSheet(
                 IconButton(
                     onClick = {
                         val name = userProfile?.nickname ?: userProfile?.username ?: "该用户"
-                        onReportUser?.invoke(userId, name)
+                        val targetId = userProfile?.id?.takeIf { it.isNotBlank() } ?: userId ?: ""
+                        onReportUser?.invoke(targetId, name)
                     }
                 ) {
                     Icon(
@@ -297,7 +298,8 @@ fun UserProfileBottomSheet(
                                 text = "发私信",
                                 onClick = {
                                     onDismissRequest()
-                                    onNavigateToChat(userId, displayName)
+                                    val targetId = userProfile?.id?.takeIf { it.isNotBlank() } ?: userId ?: ""
+                                    onNavigateToChat(targetId, displayName)
                                 },
                                 modifier = Modifier.weight(1f),
                                 isPrimary = isFollowing
