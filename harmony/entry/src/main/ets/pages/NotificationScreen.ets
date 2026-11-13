@@ -27,11 +27,12 @@ export interface GroupJoinRequest {
 }
 
 /**
- * 鸿蒙原生通知中心与入群申请审批 (NotificationScreen)
- * - 纯粹质感，沉浸卡片
- * - 双 Tab：消息通知 / 入群申请审批 (Requests Management)
- * - 全部标为已读
+ * 鸿蒙原生通知中心与入群申请审批 (NotificationScreen ArkUI)
+ * - 纯粹质感，沉浸卡片，无任何 Emoji
+ * - 双 Tab：互动通知 / 入群申请审批 (Requests Management)
+ * - 一键全部标为已读
  * - 一键同意 / 拒绝入群申请
+ * - 鸿蒙官方沉浸光感
  */
 @Component
 export struct NotificationScreen {
@@ -47,12 +48,12 @@ export struct NotificationScreen {
   async loadData() {
     this.isLoading = true;
     if (this.selectedTab === 0) {
-      const res = await HttpUtils.get<AppNotification[]>('/notifications');
+      const res = await HttpUtils.get<AppNotification[]>('api/notifications');
       if (res.isSuccess && res.data) {
         this.notifications = res.data;
       }
     } else {
-      const res = await HttpUtils.get<GroupJoinRequest[]>('/chat/rooms/requests');
+      const res = await HttpUtils.get<GroupJoinRequest[]>('api/chat/rooms/requests');
       if (res.isSuccess && res.data) {
         this.groupRequests = res.data;
       }
@@ -61,7 +62,7 @@ export struct NotificationScreen {
   }
 
   async handleMarkAllAsRead() {
-    const res = await HttpUtils.post<{ success: boolean }>('/notifications/read-all');
+    const res = await HttpUtils.post<{ success: boolean }>('api/notifications/read-all');
     if (res.isSuccess) {
       this.notifications.forEach((item) => {
         item.is_read = true;
@@ -71,7 +72,7 @@ export struct NotificationScreen {
   }
 
   async handleApproveRequest(req: GroupJoinRequest) {
-    const res = await HttpUtils.post<{ success: boolean }>(`/chat/rooms/requests/${req.id}/approve`);
+    const res = await HttpUtils.post<{ success: boolean }>(`api/chat/rooms/requests/${req.id}/approve`);
     if (res.isSuccess) {
       req.status = 'approved';
       promptAction.showToast({ message: `已同意 ${req.username} 加入群聊` });
@@ -81,7 +82,7 @@ export struct NotificationScreen {
   }
 
   async handleRejectRequest(req: GroupJoinRequest) {
-    const res = await HttpUtils.post<{ success: boolean }>(`/chat/rooms/requests/${req.id}/reject`);
+    const res = await HttpUtils.post<{ success: boolean }>(`api/chat/rooms/requests/${req.id}/reject`);
     if (res.isSuccess) {
       req.status = 'rejected';
       promptAction.showToast({ message: `已拒绝 ${req.username} 入群申请` });
@@ -92,12 +93,12 @@ export struct NotificationScreen {
 
   build() {
     Column() {
-      // 沉浸顶栏
+      // 沉浸顶栏 (backgroundBlurStyle)
       Row() {
         Text('通知中心')
-          .fontSize(18)
+          .fontSize(20)
           .fontWeight(FontWeight.Bold)
-          .fontColor(DeepColors.TextPrimary)
+          .fontColor(DeepColors.TEXT_PRIMARY)
 
         Blank()
 
@@ -105,11 +106,12 @@ export struct NotificationScreen {
           Row() {
             Text('全部已读')
               .fontSize(12)
-              .fontColor(DeepColors.Primary)
+              .fontColor(DeepColors.PRIMARY)
           }
-          .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-          .borderRadius(6)
-          .backgroundColor('#1A3B82F6')
+          .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+          .borderRadius(8)
+          .backgroundColor('rgba(59, 130, 246, 0.12)')
+          .border({ width: 0.6, color: 'rgba(59, 130, 246, 0.3)' })
           .onClick(() => this.handleMarkAllAsRead())
         }
       }
@@ -124,11 +126,11 @@ export struct NotificationScreen {
           Text('互动通知')
             .fontSize(13)
             .fontWeight(this.selectedTab === 0 ? FontWeight.Bold : FontWeight.Normal)
-            .fontColor(this.selectedTab === 0 ? DeepColors.TextPrimary : DeepColors.TextSecondary)
+            .fontColor(this.selectedTab === 0 ? Color.White : DeepColors.TEXT_SECONDARY)
         }
-        .padding({ left: 16, right: 16, top: 6, bottom: 6 })
-        .borderRadius(6)
-        .backgroundColor(this.selectedTab === 0 ? DeepColors.SurfaceRaised : Color.Transparent)
+        .padding({ left: 16, right: 16, top: 7, bottom: 7 })
+        .borderRadius(8)
+        .backgroundColor(this.selectedTab === 0 ? DeepColors.PRIMARY : Color.Transparent)
         .onClick(() => {
           this.selectedTab = 0;
           this.loadData();
@@ -138,18 +140,18 @@ export struct NotificationScreen {
           Text('入群申请审批')
             .fontSize(13)
             .fontWeight(this.selectedTab === 1 ? FontWeight.Bold : FontWeight.Normal)
-            .fontColor(this.selectedTab === 1 ? DeepColors.TextPrimary : DeepColors.TextSecondary)
+            .fontColor(this.selectedTab === 1 ? Color.White : DeepColors.TEXT_SECONDARY)
         }
-        .padding({ left: 16, right: 16, top: 6, bottom: 6 })
-        .borderRadius(6)
-        .backgroundColor(this.selectedTab === 1 ? DeepColors.SurfaceRaised : Color.Transparent)
+        .padding({ left: 16, right: 16, top: 7, bottom: 7 })
+        .borderRadius(8)
+        .backgroundColor(this.selectedTab === 1 ? DeepColors.PRIMARY : Color.Transparent)
         .onClick(() => {
           this.selectedTab = 1;
           this.loadData();
         })
       }
       .width('100%')
-      .padding({ left: 16, right: 16, bottom: 10 })
+      .padding({ left: 16, right: 16, bottom: 12 })
 
       // 列表内容
       if (this.selectedTab === 0) {
@@ -157,38 +159,38 @@ export struct NotificationScreen {
           Column() {
             Text('暂无新通知')
               .fontSize(13)
-              .fontColor(DeepColors.TextTertiary)
+              .fontColor(DeepColors.TEXT_TERTIARY)
           }
           .width('100%')
           .layoutWeight(1)
           .justifyContent(FlexAlign.Center)
         } else {
-          List() {
+          List({ space: 10 }) {
             ForEach(this.notifications, (item: AppNotification) => {
               ListItem() {
                 Row() {
-                  // 未读红点
+                  // 未读高亮光点
                   if (!item.is_read) {
-                    Circle({ width: 7, height: 7 })
-                      .fill(DeepColors.Primary)
+                    Circle({ width: 6, height: 6 })
+                      .fill(DeepColors.PRIMARY)
                       .margin({ right: 10 })
                   }
 
-                  Column() {
-                    Text(item.title || (item.type === 'like' ? '点赞提醒' : '新互动提醒'))
+                  Column({ space: 3 }) {
+                    Text(item.title || (item.type === 'like' ? '点赞提醒' : '互动提醒'))
                       .fontSize(14)
                       .fontWeight(FontWeight.Bold)
-                      .fontColor(DeepColors.TextPrimary)
+                      .fontColor(DeepColors.TEXT_PRIMARY)
 
                     Text(item.content)
                       .fontSize(13)
-                      .fontColor(DeepColors.TextSecondary)
+                      .fontColor(DeepColors.TEXT_SECONDARY)
                       .lineHeight(18)
-                      .margin({ top: 4, bottom: 4 })
+                      .margin({ top: 2, bottom: 2 })
 
                     Text(item.created_at || '刚刚')
-                      .fontSize(11)
-                      .fontColor(DeepColors.TextTertiary)
+                      .fontSize(10)
+                      .fontColor(DeepColors.TEXT_TERTIARY)
                   }
                   .alignItems(HorizontalAlign.Start)
                   .layoutWeight(1)
@@ -196,14 +198,14 @@ export struct NotificationScreen {
                 .width('100%')
                 .padding(14)
                 .borderRadius(12)
-                .backgroundColor(item.is_read ? DeepColors.Surface : DeepColors.SurfaceRaised)
-                .border({ width: 0.6, color: DeepColors.GlassBorder, radius: 12 })
+                .backgroundColor(item.is_read ? 'rgba(28, 28, 30, 0.45)' : 'rgba(28, 28, 30, 0.75)')
+                .border({ width: 0.6, color: item.is_read ? 'rgba(255, 255, 255, 0.05)' : 'rgba(59, 130, 246, 0.25)', radius: 12 })
               }
-              .padding({ left: 16, right: 16, bottom: 10 })
+              .padding({ left: 16, right: 16 })
             }, (item: AppNotification) => item.id)
 
             ListItem() {
-              Column().height(60)
+              Column().height(80)
             }
           }
           .width('100%')
@@ -214,62 +216,63 @@ export struct NotificationScreen {
           Column() {
             Text('暂无待审批的入群申请')
               .fontSize(13)
-              .fontColor(DeepColors.TextTertiary)
+              .fontColor(DeepColors.TEXT_TERTIARY)
           }
           .width('100%')
           .layoutWeight(1)
           .justifyContent(FlexAlign.Center)
         } else {
-          List() {
+          List({ space: 10 }) {
             ForEach(this.groupRequests, (req: GroupJoinRequest) => {
               ListItem() {
-                Column() {
+                Column({ space: 8 }) {
                   Row() {
                     Image(req.avatar_url || '')
                       .width(40)
                       .height(40)
                       .borderRadius(20)
-                      .backgroundColor(DeepColors.SurfaceRaised)
+                      .backgroundColor('rgba(255, 255, 255, 0.05)')
+                      .border({ width: 1, color: 'rgba(255, 255, 255, 0.12)' })
                       .alt('')
 
-                    Column() {
+                    Column({ space: 2 }) {
                       Text(req.username)
                         .fontSize(14)
                         .fontWeight(FontWeight.Bold)
-                        .fontColor(DeepColors.TextPrimary)
+                        .fontColor(DeepColors.TEXT_PRIMARY)
 
                       Text(`申请加入群聊: ${req.room_name || '社区讨论组'}`)
                         .fontSize(11)
-                        .fontColor(DeepColors.TextTertiary)
-                        .margin({ top: 2 })
+                        .fontColor(DeepColors.TEXT_TERTIARY)
                     }
                     .alignItems(HorizontalAlign.Start)
                     .margin({ left: 10 })
                     .layoutWeight(1)
 
                     if (req.status === 'pending') {
-                      Row() {
+                      Row({ space: 6 }) {
                         Button('拒绝')
                           .fontSize(11)
-                          .fontColor(DeepColors.TextSecondary)
-                          .backgroundColor(DeepColors.SurfaceRaised)
+                          .fontColor(DeepColors.TEXT_SECONDARY)
+                          .backgroundColor('rgba(255, 255, 255, 0.06)')
                           .height(28)
                           .padding({ left: 10, right: 10 })
+                          .borderRadius(6)
                           .onClick(() => this.handleRejectRequest(req))
 
                         Button('同意')
                           .fontSize(11)
-                          .fontColor(DeepColors.TextPrimary)
-                          .backgroundColor(DeepColors.Primary)
+                          .fontColor(Color.White)
+                          .backgroundColor(DeepColors.PRIMARY)
                           .height(28)
                           .padding({ left: 10, right: 10 })
-                          .margin({ left: 6 })
+                          .borderRadius(6)
                           .onClick(() => this.handleApproveRequest(req))
                       }
                     } else {
                       Text(req.status === 'approved' ? '已同意' : '已拒绝')
                         .fontSize(12)
-                        .fontColor(req.status === 'approved' ? DeepColors.Success : DeepColors.TextTertiary)
+                        .fontColor(req.status === 'approved' ? DeepColors.ACCENT_SUCCESS : DeepColors.TEXT_TERTIARY)
                     }
                   }
                   .width('100%')
@@ -278,21 +281,21 @@ export struct NotificationScreen {
                   if (req.reason) {
                     Text(`申请理由: ${req.reason}`)
                       .fontSize(12)
-                      .fontColor(DeepColors.TextSecondary)
-                      .margin({ left: 50, top: 8 })
+                      .fontColor(DeepColors.TEXT_SECONDARY)
+                      .margin({ left: 50 })
                   }
                 }
                 .width('100%')
                 .padding(14)
                 .borderRadius(12)
-                .backgroundColor(DeepColors.Surface)
-                .border({ width: 0.6, color: DeepColors.GlassBorder, radius: 12 })
+                .backgroundColor('rgba(28, 28, 30, 0.55)')
+                .border({ width: 0.6, color: 'rgba(255, 255, 255, 0.06)', radius: 12 })
               }
-              .padding({ left: 16, right: 16, bottom: 10 })
+              .padding({ left: 16, right: 16 })
             }, (req: GroupJoinRequest) => req.id)
 
             ListItem() {
-              Column().height(60)
+              Column().height(80)
             }
           }
           .width('100%')
@@ -302,6 +305,6 @@ export struct NotificationScreen {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(DeepColors.Background)
+    .backgroundColor(DeepColors.BACKGROUND)
   }
 }

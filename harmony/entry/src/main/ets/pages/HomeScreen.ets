@@ -36,7 +36,7 @@ export struct HomeScreen {
   async loadCategories() {
     try {
       const res = await HttpUtils.get<CategoryItem[]>('api/posts/categories');
-      this.categories = res || [];
+      this.categories = (res.isSuccess && res.data) ? res.data : [];
     } catch (e) {
       console.error('Failed to load categories: ' + JSON.stringify(e));
     }
@@ -57,7 +57,7 @@ export struct HomeScreen {
         params.q = this.searchQuery.trim();
       }
       const res = await HttpUtils.get<PostItem[]>('api/posts', params);
-      this.posts = res || [];
+      this.posts = (res.isSuccess && res.data) ? res.data : [];
     } catch (e) {
       console.error('Failed to load posts: ' + JSON.stringify(e));
       promptAction.showToast({ message: '加载帖子失败，请重试' });
@@ -69,7 +69,7 @@ export struct HomeScreen {
 
   build() {
     Column() {
-      // 1. 顶栏 (Header)
+      // 1. 顶栏 (Header) - 鸿蒙官方沉浸光感
       Row() {
         Row({ space: 8 }) {
           Button({ type: ButtonType.Normal }) {
@@ -108,13 +108,13 @@ export struct HomeScreen {
           }
           .width(36)
           .height(36)
-          .backgroundColor(this.isSearchActive ? 'rgba(59, 130, 246, 0.15)' : DeepColors.SURFACE_ELEVATED)
-          .border({ width: 0.8, color: DeepColors.BORDER })
+          .backgroundColor(this.isSearchActive ? 'rgba(59, 130, 246, 0.15)' : 'rgba(28, 28, 30, 0.65)')
+          .border({ width: 0.8, color: 'rgba(255, 255, 255, 0.08)' })
           .onClick(() => {
             this.isSearchActive = !this.isSearchActive;
           })
 
-          // 全站榜单胶囊按钮
+          // 全站榜单胶囊按钮 - 沉浸微高光
           Row({ space: 4 }) {
             SymbolGlyph($r('sys.symbol.chart_bar_fill'))
               .fontSize(15)
@@ -128,8 +128,8 @@ export struct HomeScreen {
           .height(36)
           .padding({ left: 12, right: 12 })
           .borderRadius(18)
-          .backgroundColor(DeepColors.SURFACE_ELEVATED)
-          .border({ width: 0.8, color: DeepColors.BORDER })
+          .backgroundColor('rgba(28, 28, 30, 0.65)')
+          .border({ width: 0.8, color: 'rgba(255, 255, 255, 0.08)' })
           .onClick(() => {
             this.showLeaderboardSheet = true;
           })
@@ -139,6 +139,7 @@ export struct HomeScreen {
       .padding({ left: 16, right: 16, top: 12, bottom: 8 })
       .justifyContent(FlexAlign.SpaceBetween)
       .alignItems(VerticalAlign.Center)
+      .backgroundBlurStyle(BlurStyle.Thin, { colorMode: ThemeColorMode.DARK })
 
       // 展开实时搜索条
       if (this.isSearchActive) {

@@ -1,10 +1,22 @@
 import http from '@ohos.net.http';
-import promptAction from '@ohos.promptAction';
 import { Constants } from './Constants';
 import { StorageManager } from './Storage';
 
 /**
+ * 统一网络返回结果
+ */
+export interface ApiResponse<T> {
+  isSuccess: boolean;
+  data?: T;
+  errorMsg?: string;
+  errorCode?: number;
+}
+
+/**
  * 鸿蒙原生网络通信请求客户端 (基于 @ohos.net.http)
+ * - 自动适配 api/ 前缀
+ * - 统一 Bearer Token 拦截与鉴权
+ * - 安全捕获与标准化 ApiResponse
  */
 export class HttpUtils {
   private static async request<T>(
@@ -12,11 +24,22 @@ export class HttpUtils {
     path: string,
     params?: Record<string, string | number | boolean>,
     body?: object
-  ): Promise<T> {
+  ): Promise<ApiResponse<T>> {
     const httpRequest = http.createHttp();
     const token = StorageManager.getInstance().getToken();
 
-    let fullUrl = path.startsWith('http') ? path : `${Constants.BASE_URL.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+    // 格式化与规范化 URL，自动确保拥有 /api/ 前缀
+    let cleanPath = path.replace(/^\/+/, '');
+    if (!cleanPath.startsWith('http')) {
+      if (!cleanPath.startsWith('api/')) {
+        cleanPath = `api/${cleanPath}`;
+      }
+    }
+
+    let fullUrl = cleanPath.startsWith('http')
+      ? cleanPath
+      : `${Constants.BASE_URL.replace(/\/+$/, '')}/${cleanPath}`;
+
     if (params) {
       const queryParts: string[] = [];
       Object.keys(params).forEach((key) => {
@@ -53,9 +76,14 @@ export class HttpUtils {
       if (response.responseCode >= 200 && response.responseCode < 300) {
         const resultStr = response.result as string;
         if (!resultStr || resultStr.trim() === '') {
-          return {} as T;
+          return { isSuccess: true, data: undefined };
         }
-        return JSON.parse(resultStr) as T;
+        try {
+          const parsed = JSON.parse(resultStr) as T;
+          return { isSuccess: true, data: parsed };
+        } catch (_e) {
+          return { isSuccess: true, data: (resultStr as unknown) as T };
+        }
       } else {
         let msg = `请求失败 (${response.responseCode})`;
         try {
@@ -63,30 +91,28 @@ export class HttpUtils {
           if (errObj.detail) msg = errObj.detail;
           else if (errObj.message) msg = errObj.message;
         } catch (_ignore) {}
-        console.error(`Http error [${fullUrl}]: ${msg}`);
-        throw new Error(msg);
+        return { isSuccess: false, errorCode: response.responseCode, errorMsg: msg };
       }
     } catch (err) {
       httpRequest.destroy();
       const message = err.message || '网络连接超时，请重试';
-      console.error(`Http failed: ${message}`);
-      throw new Error(message);
+      return { isSuccess: false, errorCode: -1, errorMsg: message };
     }
   }
 
-  static async get<T>(path: string, params?: Record<string, string | number | boolean>): Promise<T> {
+  static async get<T>(path: string, params?: Record<string, string | number | boolean>): Promise<ApiResponse<T>> {
     return HttpUtils.request<T>(http.RequestMethod.GET, path, params);
   }
 
-  static async post<T>(path: string, body?: object): Promise<T> {
+  static async post<T>(path: string, body?: object): Promise<ApiResponse<T>> {
     return HttpUtils.request<T>(http.RequestMethod.POST, path, undefined, body);
   }
 
-  static async put<T>(path: string, body?: object): Promise<T> {
+  static async put<T>(path: string, body?: object): Promise<ApiResponse<T>> {
     return HttpUtils.request<T>(http.RequestMethod.PUT, path, undefined, body);
   }
 
-  static async delete<T>(path: string): Promise<T> {
+  static async delete<T>(path: string): Promise<ApiResponse<T>> {
     return HttpUtils.request<T>(http.RequestMethod.DELETE, path);
   }
 }

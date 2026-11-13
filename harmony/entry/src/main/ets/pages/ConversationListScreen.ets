@@ -5,7 +5,9 @@ import router from '@ohos.router';
 
 /**
  * 鸿蒙原生会话大厅 (ConversationListScreen ArkUI)
- * 私聊会话 / 社区群聊 双列表切换，支持独立未读角标红点统计与快速接入
+ * - 私聊会话 / 社区群聊 双列表切换
+ * - 独立未读角标红点统计与快速接入
+ * - 鸿蒙官方沉浸光感渲染 (backgroundBlurStyle)
  */
 @Component
 export struct ConversationListScreen {
@@ -30,7 +32,7 @@ export struct ConversationListScreen {
   async loadConversations() {
     try {
       const res = await HttpUtils.get<ConversationItem[]>('api/chat/conversations');
-      this.conversations = res || [];
+      this.conversations = (res.isSuccess && res.data) ? res.data : [];
       this.privateUnreadCount = this.conversations.reduce((sum, item) => sum + (item.unread_count || 0), 0);
     } catch (e) {
       console.error('Failed to load conversations: ' + JSON.stringify(e));
@@ -40,7 +42,7 @@ export struct ConversationListScreen {
   async loadGroups() {
     try {
       const res = await HttpUtils.get<GroupRoomItem[]>('api/chat/groups');
-      this.groups = res || [];
+      this.groups = (res.isSuccess && res.data) ? res.data : [];
       this.groupUnreadCount = this.groups.reduce((sum, item) => sum + (item.unread_count || 0), 0);
     } catch (e) {
       console.error('Failed to load groups: ' + JSON.stringify(e));
@@ -49,10 +51,10 @@ export struct ConversationListScreen {
 
   build() {
     Column() {
-      // 顶部标题
+      // 顶部标题与沉浸光感栏
       Row() {
         Text('会话大厅')
-          .fontSize(22)
+          .fontSize(20)
           .fontWeight(FontWeight.Bold)
           .fontColor(DeepColors.TEXT_PRIMARY)
       }
@@ -66,9 +68,9 @@ export struct ConversationListScreen {
           this.TabPill('社区群聊', 1, this.groupUnreadCount)
         }
         .padding(4)
-        .borderRadius(20)
-        .backgroundColor(DeepColors.SURFACE_ELEVATED)
-        .border({ width: 0.8, color: DeepColors.BORDER })
+        .borderRadius(18)
+        .backgroundColor('rgba(28, 28, 30, 0.65)')
+        .border({ width: 0.8, color: 'rgba(255, 255, 255, 0.08)' })
       }
       .width('100%')
       .padding({ left: 16, right: 16, bottom: 12 })
@@ -111,8 +113,8 @@ export struct ConversationListScreen {
           .backgroundColor(DeepColors.ACCENT_ERROR)
       }
     }
-    .padding({ left: 18, right: 18, top: 8, bottom: 8 })
-    .borderRadius(16)
+    .padding({ left: 18, right: 18, top: 7, bottom: 7 })
+    .borderRadius(14)
     .backgroundColor(this.selectedTab === index ? DeepColors.PRIMARY : Color.Transparent)
     .onClick(() => {
       this.selectedTab = index;
@@ -139,38 +141,39 @@ export struct ConversationListScreen {
                 .width(46)
                 .height(46)
                 .borderRadius(23)
-                .objectFit(ImageFit.Cover)
-                .alt($r('sys.media.ohos_ic_public_user_head'))
+                .backgroundColor('rgba(255, 255, 255, 0.05)')
+                .border({ width: 1, color: 'rgba(255, 255, 255, 0.12)' })
+                .alt('')
 
               Column({ space: 4 }) {
                 Row() {
-                  Text(conv.peer_nickname || conv.peer_username || conv.target_user?.nickname || '用户')
+                  Text(conv.peer_nickname || conv.peer_username || conv.target_user?.nickname || '居民')
                     .fontSize(15)
-                    .fontWeight(FontWeight.SemiBold)
+                    .fontWeight(FontWeight.Bold)
                     .fontColor(DeepColors.TEXT_PRIMARY)
+                    .layoutWeight(1)
 
-                  Text((conv.last_message_at || conv.updated_at || '').slice(0, 10))
-                    .fontSize(11)
+                  Text(conv.last_message_at || '')
+                    .fontSize(10)
                     .fontColor(DeepColors.TEXT_TERTIARY)
                 }
                 .width('100%')
-                .justifyContent(FlexAlign.SpaceBetween)
 
                 Row() {
-                  Text(conv.last_message_preview || '暂无消息')
-                    .fontSize(13)
+                  Text(conv.last_message || '暂无消息')
+                    .fontSize(12)
                     .fontColor(DeepColors.TEXT_SECONDARY)
                     .maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                     .layoutWeight(1)
 
-                  if (conv.unread_count > 0) {
+                  if (conv.unread_count && conv.unread_count > 0) {
                     Text(conv.unread_count > 99 ? '99+' : `${conv.unread_count}`)
                       .fontSize(9)
                       .fontWeight(FontWeight.Bold)
                       .fontColor(Color.White)
                       .padding({ left: 6, right: 6, top: 1, bottom: 1 })
-                      .borderRadius(8)
+                      .borderRadius(10)
                       .backgroundColor(DeepColors.ACCENT_ERROR)
                   }
                 }
@@ -181,15 +184,14 @@ export struct ConversationListScreen {
             }
             .width('100%')
             .padding(14)
-            .borderRadius(16)
-            .backgroundColor(DeepColors.SURFACE)
-            .border({ width: 0.6, color: DeepColors.BORDER })
+            .borderRadius(14)
+            .backgroundColor('rgba(28, 28, 30, 0.55)')
+            .border({ width: 0.6, color: 'rgba(255, 255, 255, 0.06)', radius: 14 })
             .onClick(() => {
-              const title = conv.peer_nickname || conv.peer_username || '私信会话';
-              this.onConversationClick(conv.id, false, title);
+              this.onConversationClick(conv.id, false, conv.peer_nickname || conv.peer_username || '私聊');
             })
           }
-        })
+        }, (conv: ConversationItem) => conv.id)
       }
       .width('100%')
       .layoutWeight(1)
@@ -201,7 +203,7 @@ export struct ConversationListScreen {
   GroupChatListView() {
     if (this.groups.length === 0) {
       Column({ space: 8 }) {
-        Text('暂无群聊，快去加入吧')
+        Text('暂无群聊房间')
           .fontSize(13)
           .fontColor(DeepColors.TEXT_TERTIARY)
       }
@@ -213,45 +215,43 @@ export struct ConversationListScreen {
         ForEach(this.groups, (group: GroupRoomItem) => {
           ListItem() {
             Row({ space: 12 }) {
-              Image(Constants.formatImageUrl(group.avatar_url))
+              Image(Constants.formatImageUrl(group.icon_url))
                 .width(46)
                 .height(46)
-                .borderRadius(23)
-                .objectFit(ImageFit.Cover)
-                .alt($r('sys.media.ohos_ic_public_user_head'))
+                .borderRadius(14)
+                .backgroundColor('rgba(255, 255, 255, 0.05)')
+                .border({ width: 1, color: 'rgba(255, 255, 255, 0.12)' })
+                .alt('')
 
               Column({ space: 4 }) {
                 Row() {
                   Text(group.name)
                     .fontSize(15)
-                    .fontWeight(FontWeight.SemiBold)
+                    .fontWeight(FontWeight.Bold)
                     .fontColor(DeepColors.TEXT_PRIMARY)
+                    .layoutWeight(1)
 
-                  Text(`${group.memberCount || 1} 人`)
+                  Text(`${group.member_count || 0} 人`)
                     .fontSize(10)
-                    .fontColor(DeepColors.PRIMARY)
-                    .padding({ left: 5, right: 5, top: 1, bottom: 1 })
-                    .borderRadius(4)
-                    .backgroundColor('rgba(59, 130, 246, 0.12)')
+                    .fontColor(DeepColors.TEXT_TERTIARY)
                 }
                 .width('100%')
-                .justifyContent(FlexAlign.SpaceBetween)
 
                 Row() {
-                  Text(group.last_message_preview || group.description || '极客交流专属群')
-                    .fontSize(13)
+                  Text(group.last_message || group.description || '社区讨论群')
+                    .fontSize(12)
                     .fontColor(DeepColors.TEXT_SECONDARY)
                     .maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                     .layoutWeight(1)
 
-                  if (group.unread_count > 0) {
+                  if (group.unread_count && group.unread_count > 0) {
                     Text(group.unread_count > 99 ? '99+' : `${group.unread_count}`)
                       .fontSize(9)
                       .fontWeight(FontWeight.Bold)
                       .fontColor(Color.White)
                       .padding({ left: 6, right: 6, top: 1, bottom: 1 })
-                      .borderRadius(8)
+                      .borderRadius(10)
                       .backgroundColor(DeepColors.ACCENT_ERROR)
                   }
                 }
@@ -262,14 +262,14 @@ export struct ConversationListScreen {
             }
             .width('100%')
             .padding(14)
-            .borderRadius(16)
-            .backgroundColor(DeepColors.SURFACE)
-            .border({ width: 0.6, color: DeepColors.BORDER })
+            .borderRadius(14)
+            .backgroundColor('rgba(28, 28, 30, 0.55)')
+            .border({ width: 0.6, color: 'rgba(255, 255, 255, 0.06)', radius: 14 })
             .onClick(() => {
               this.onConversationClick(group.id, true, group.name);
             })
           }
-        })
+        }, (group: GroupRoomItem) => group.id)
       }
       .width('100%')
       .layoutWeight(1)

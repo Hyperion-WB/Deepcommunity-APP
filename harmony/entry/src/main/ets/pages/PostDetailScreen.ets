@@ -4,14 +4,16 @@ import { DeepColors } from '../common/Constants';
 import { HttpUtils } from '../common/HttpUtils';
 import { PostItem, CommentItem } from '../model/PostModels';
 import { UserProfileSheet } from '../components/UserProfileSheet';
+import { StickerManageSheet } from '../components/StickerManageSheet';
 
 /**
  * 鸿蒙原生帖子详情与交互页面 (PostDetailScreen)
  * - 沉浸式磨砂顶栏与平滑回退
  * - 作者信息与独立防变形等级徽章
  * - 正文与多图展示
- * - 点赞、收藏、举报违规通道 (Report)
- * - 评论互动流：问答采纳 (Accept)、评论置顶 (Feature)、发表评论
+ * - 点赞、收藏、帖子/评论举报违规通道 (Report)
+ * - 评论互动流：问答采纳 (Accept)、评论置顶 (Feature)、发表评论、表情包
+ * - 官方沉浸光感渲染 (backgroundBlurStyle)
  */
 @Entry
 @Component
@@ -25,7 +27,10 @@ export struct PostDetailScreen {
   @State showUserSheet: boolean = false;
   @State selectedUserId: string = '';
   @State showReportDialog: boolean = false;
+  @State reportTargetType: string = 'post'; // 'post' | 'comment'
+  @State reportTargetId: string = '';
   @State reportReason: string = '';
+  @State showStickerSheet: boolean = false;
 
   aboutToAppear() {
     const params = router.getParams() as Record<string, Object>;
@@ -38,7 +43,7 @@ export struct PostDetailScreen {
 
   async loadPostDetail() {
     this.isLoading = true;
-    const res = await HttpUtils.get<PostItem>(`/posts/${this.postId}`);
+    const res = await HttpUtils.get<PostItem>(`api/posts/${this.postId}`);
     this.isLoading = false;
     if (res.isSuccess && res.data) {
       this.post = res.data;
@@ -48,7 +53,7 @@ export struct PostDetailScreen {
   }
 
   async loadComments() {
-    const res = await HttpUtils.get<CommentItem[]>(`/posts/${this.postId}/comments`);
+    const res = await HttpUtils.get<CommentItem[]>(`api/posts/${this.postId}/comments`);
     if (res.isSuccess && res.data) {
       this.comments = res.data;
     }
@@ -61,7 +66,7 @@ export struct PostDetailScreen {
     this.post.is_liked = !prevLiked;
     this.post.like_count = prevLiked ? Math.max(0, prevCount - 1) : prevCount + 1;
 
-    const res = await HttpUtils.post<{ liked: boolean; count: number }>(`/posts/${this.postId}/like`);
+    const res = await HttpUtils.post<{ liked: boolean; count: number }>(`api/posts/${this.postId}/like`);
     if (res.isSuccess && res.data) {
       this.post.is_liked = res.data.liked;
       this.post.like_count = res.data.count;
@@ -69,7 +74,7 @@ export struct PostDetailScreen {
   }
 
   async handleToggleFavorite() {
-    const res = await HttpUtils.post<{ favorited: boolean }>(`/posts/${this.postId}/favorite`);
+    const res = await HttpUtils.post<{ favorited: boolean }>(`api/posts/${this.postId}/favorite`);
     if (res.isSuccess) {
       promptAction.showToast({ message: res.data?.favorited ? '已加入个人收藏' : '已取消收藏' });
     }
@@ -78,7 +83,7 @@ export struct PostDetailScreen {
   async handleSendComment() {
     if (!this.commentInput.trim() || this.isSubmittingComment) return;
     this.isSubmittingComment = true;
-    const res = await HttpUtils.post<CommentItem>(`/posts/${this.postId}/comments`, {
+    const res = await HttpUtils.post<CommentItem>(`api/posts/${this.postId}/comments`, {
       content: this.commentInput.trim()
     });
     this.isSubmittingComment = false;
@@ -93,7 +98,7 @@ export struct PostDetailScreen {
   }
 
   async handleAcceptComment(comment: CommentItem) {
-    const res = await HttpUtils.post<{ success: boolean }>(`/posts/${this.postId}/accept/${comment.id}`);
+    const res = await HttpUtils.post<{ success: boolean }>(`api/posts/${this.postId}/accept/${comment.id}`);
     if (res.isSuccess) {
       comment.is_accepted = true;
       promptAction.showToast({ message: '已采纳该回答为最佳答案' });
@@ -103,11 +108,18 @@ export struct PostDetailScreen {
   }
 
   async handleFeatureComment(comment: CommentItem) {
-    const res = await HttpUtils.post<{ success: boolean }>(`/posts/${this.postId}/comments/${comment.id}/feature`);
+    const res = await HttpUtils.post<{ success: boolean }>(`api/posts/${this.postId}/comments/${comment.id}/feature`);
     if (res.isSuccess) {
       comment.is_featured = !comment.is_featured;
       promptAction.showToast({ message: comment.is_featured ? '已将该评论置顶' : '已取消置顶' });
     }
+  }
+
+  openReport(targetType: string, targetId: string) {
+    this.reportTargetType = targetType;
+    this.reportTargetId = targetId;
+    this.reportReason = '';
+    this.showReportDialog = true;
   }
 
   async handleSubmitReport() {
@@ -115,9 +127,9 @@ export struct PostDetailScreen {
       promptAction.showToast({ message: '请填写举报原因' });
       return;
     }
-    const res = await HttpUtils.post<{ success: boolean }>(`/reports`, {
-      target_type: 'post',
-      target_id: this.postId,
+    const res = await HttpUtils.post<{ success: boolean }>('api/reports', {
+      target_type: this.reportTargetType,
+      target_id: this.reportTargetId,
       reason: this.reportReason.trim()
     });
     this.showReportDialog = false;
@@ -132,18 +144,17 @@ export struct PostDetailScreen {
   build() {
     Stack({ alignContent: Alignment.Bottom }) {
       Column() {
-        // 顶部沉浸导航栏
+        // 顶部沉浸导航栏 (backgroundBlurStyle)
         Row() {
-          Row() {
-            Text('←')
+          Button({ type: ButtonType.Circle }) {
+            SymbolGlyph($r('sys.symbol.chevron_left'))
               .fontSize(20)
-              .fontColor(DeepColors.TextPrimary)
+              .fontColor([DeepColors.TEXT_PRIMARY])
           }
           .width(36)
           .height(36)
-          .borderRadius(18)
-          .backgroundColor(DeepColors.SurfaceRaised)
-          .justifyContent(FlexAlign.Center)
+          .backgroundColor('rgba(28, 28, 30, 0.65)')
+          .border({ width: 0.8, color: 'rgba(255, 255, 255, 0.08)' })
           .onClick(() => {
             router.back();
           })
@@ -151,28 +162,29 @@ export struct PostDetailScreen {
           Text('帖子详情')
             .fontSize(16)
             .fontWeight(FontWeight.Bold)
-            .fontColor(DeepColors.TextPrimary)
+            .fontColor(DeepColors.TEXT_PRIMARY)
             .margin({ left: 12 })
             .layoutWeight(1)
 
-          // 举报通道入口
+          // 举报帖子通道
           Row() {
             Text('举报')
               .fontSize(12)
-              .fontColor(DeepColors.TextTertiary)
+              .fontColor(DeepColors.TEXT_TERTIARY)
           }
-          .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-          .borderRadius(6)
-          .backgroundColor(DeepColors.SurfaceRaised)
+          .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+          .borderRadius(8)
+          .backgroundColor('rgba(28, 28, 30, 0.65)')
+          .border({ width: 0.6, color: 'rgba(255, 255, 255, 0.06)' })
           .onClick(() => {
-            this.showReportDialog = true;
+            this.openReport('post', this.postId);
           })
         }
         .width('100%')
         .height(52)
         .padding({ left: 16, right: 16 })
-        .backgroundColor(DeepColors.Surface)
-        .border({ width: { bottom: 0.6 }, color: DeepColors.GlassBorder })
+        .backgroundBlurStyle(BlurStyle.Thin, { colorMode: ThemeColorMode.DARK })
+        .border({ width: { bottom: 0.6 }, color: 'rgba(255, 255, 255, 0.08)' })
 
         // 帖子内容与评论流
         List() {
@@ -184,7 +196,8 @@ export struct PostDetailScreen {
                   .width(44)
                   .height(44)
                   .borderRadius(22)
-                  .backgroundColor(DeepColors.SurfaceRaised)
+                  .backgroundColor('rgba(255, 255, 255, 0.05)')
+                  .border({ width: 1, color: 'rgba(255, 255, 255, 0.12)' })
                   .alt('')
                   .onClick(() => {
                     this.selectedUserId = this.post?.author_id || '';
@@ -196,31 +209,31 @@ export struct PostDetailScreen {
                     Text(this.post.author_nickname || this.post.author_username || '居民')
                       .fontSize(14)
                       .fontWeight(FontWeight.Bold)
-                      .fontColor(DeepColors.TextPrimary)
+                      .fontColor(DeepColors.TEXT_PRIMARY)
 
                     // 独立防变形等级微徽章
                     Row() {
                       Text(`Lv.${this.post.author_level || 1}`)
                         .fontSize(9)
                         .fontWeight(FontWeight.Bold)
-                        .fontColor(DeepColors.Primary)
+                        .fontColor(DeepColors.PRIMARY)
                     }
                     .padding({ left: 6, right: 6, top: 1, bottom: 1 })
                     .margin({ left: 6 })
                     .borderRadius(4)
-                    .backgroundColor('#1A3B82F6')
+                    .backgroundColor('rgba(59, 130, 246, 0.14)')
                   }
                   .alignItems(VerticalAlign.Center)
 
                   Row() {
                     Text(this.post.created_at || '刚刚')
                       .fontSize(11)
-                      .fontColor(DeepColors.TextTertiary)
+                      .fontColor(DeepColors.TEXT_TERTIARY)
 
                     if (this.post.category_name) {
                       Text(` · ${this.post.category_name}`)
                         .fontSize(11)
-                        .fontColor(DeepColors.Primary)
+                        .fontColor(DeepColors.PRIMARY)
                     }
                   }
                   .margin({ top: 3 })
@@ -233,11 +246,12 @@ export struct PostDetailScreen {
                 Row() {
                   Text('收藏')
                     .fontSize(12)
-                    .fontColor(DeepColors.TextSecondary)
+                    .fontColor(DeepColors.TEXT_SECONDARY)
                 }
-                .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-                .borderRadius(6)
-                .backgroundColor(DeepColors.SurfaceRaised)
+                .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                .borderRadius(8)
+                .backgroundColor('rgba(28, 28, 30, 0.65)')
+                .border({ width: 0.6, color: 'rgba(255, 255, 255, 0.08)' })
                 .onClick(() => this.handleToggleFavorite())
               }
               .width('100%')
@@ -250,13 +264,13 @@ export struct PostDetailScreen {
                 Text(this.post.title)
                   .fontSize(18)
                   .fontWeight(FontWeight.Bold)
-                  .fontColor(DeepColors.TextPrimary)
+                  .fontColor(DeepColors.TEXT_PRIMARY)
                   .width('100%')
                   .margin({ bottom: 10 })
 
                 Text(this.post.content_md || this.post.content_html || '')
                   .fontSize(14)
-                  .fontColor(DeepColors.TextSecondary)
+                  .fontColor(DeepColors.TEXT_SECONDARY)
                   .lineHeight(22)
                   .width('100%')
 
@@ -282,24 +296,25 @@ export struct PostDetailScreen {
                     Text(this.post.is_liked ? '已点赞' : '赞')
                       .fontSize(12)
                       .fontWeight(FontWeight.Medium)
-                      .fontColor(this.post.is_liked ? DeepColors.Primary : DeepColors.TextSecondary)
+                      .fontColor(this.post.is_liked ? DeepColors.PRIMARY : DeepColors.TEXT_SECONDARY)
                     Text(` ${this.post.like_count}`)
                       .fontSize(12)
-                      .fontColor(this.post.is_liked ? DeepColors.Primary : DeepColors.TextSecondary)
+                      .fontColor(this.post.is_liked ? DeepColors.PRIMARY : DeepColors.TEXT_SECONDARY)
                   }
-                  .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                  .padding({ left: 14, right: 14, top: 6, bottom: 6 })
                   .borderRadius(8)
-                  .backgroundColor(this.post.is_liked ? '#1A3B82F6' : DeepColors.SurfaceRaised)
+                  .backgroundColor(this.post.is_liked ? 'rgba(59, 130, 246, 0.15)' : 'rgba(28, 28, 30, 0.65)')
+                  .border({ width: 0.6, color: this.post.is_liked ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.08)' })
                   .onClick(() => this.handleToggleLike())
 
                   Blank()
 
                   Text(`浏览 ${this.post.view_count}`)
                     .fontSize(11)
-                    .fontColor(DeepColors.TextTertiary)
+                    .fontColor(DeepColors.TEXT_TERTIARY)
                 }
                 .width('100%')
-                .margin({ top: 14 })
+                .margin({ top: 16 })
                 .alignItems(VerticalAlign.Center)
               }
               .width('100%')
@@ -312,11 +327,11 @@ export struct PostDetailScreen {
                 Text(`评论 (${this.comments.length})`)
                   .fontSize(14)
                   .fontWeight(FontWeight.Bold)
-                  .fontColor(DeepColors.TextPrimary)
+                  .fontColor(DeepColors.TEXT_PRIMARY)
               }
               .width('100%')
               .padding({ left: 16, right: 16, top: 12, bottom: 8 })
-              .backgroundColor(DeepColors.Surface)
+              .backgroundColor('rgba(20, 20, 22, 0.7)')
             }
 
             // 4. 评论列表
@@ -325,7 +340,7 @@ export struct PostDetailScreen {
                 Column() {
                   Text('暂无评论，来发表第一条见解吧')
                     .fontSize(12)
-                    .fontColor(DeepColors.TextTertiary)
+                    .fontColor(DeepColors.TEXT_TERTIARY)
                 }
                 .width('100%')
                 .padding({ top: 40, bottom: 40 })
@@ -340,7 +355,7 @@ export struct PostDetailScreen {
                         .width(32)
                         .height(32)
                         .borderRadius(16)
-                        .backgroundColor(DeepColors.SurfaceRaised)
+                        .backgroundColor(DeepColors.SURFACE_ELEVATED)
                         .alt('')
                         .onClick(() => {
                           this.selectedUserId = item.author_id || '';
@@ -352,7 +367,7 @@ export struct PostDetailScreen {
                           Text(item.author_nickname || item.author_username || '居民')
                             .fontSize(13)
                             .fontWeight(FontWeight.Medium)
-                            .fontColor(DeepColors.TextPrimary)
+                            .fontColor(DeepColors.TEXT_PRIMARY)
 
                           // 采纳最佳回答徽章 (Accept)
                           if (item.is_accepted) {
@@ -360,12 +375,12 @@ export struct PostDetailScreen {
                               Text('已采纳答案')
                                 .fontSize(9)
                                 .fontWeight(FontWeight.Bold)
-                                .fontColor(DeepColors.Success)
+                                .fontColor(DeepColors.ACCENT_SUCCESS)
                             }
                             .padding({ left: 5, right: 5, top: 1, bottom: 1 })
                             .margin({ left: 6 })
                             .borderRadius(4)
-                            .backgroundColor('#1A10B981')
+                            .backgroundColor('rgba(16, 185, 129, 0.15)')
                           }
 
                           // 置顶评论徽章 (Feature)
@@ -374,19 +389,19 @@ export struct PostDetailScreen {
                               Text('置顶')
                                 .fontSize(9)
                                 .fontWeight(FontWeight.Bold)
-                                .fontColor('#F59E0B')
+                                .fontColor(DeepColors.ACCENT_GOLD)
                             }
                             .padding({ left: 5, right: 5, top: 1, bottom: 1 })
                             .margin({ left: 6 })
                             .borderRadius(4)
-                            .backgroundColor('#1AF59E0B')
+                            .backgroundColor('rgba(245, 158, 11, 0.15)')
                           }
                         }
                         .alignItems(VerticalAlign.Center)
 
                         Text(item.created_at || '刚刚')
                           .fontSize(10)
-                          .fontColor(DeepColors.TextTertiary)
+                          .fontColor(DeepColors.TEXT_TERTIARY)
                           .margin({ top: 2 })
                       }
                       .alignItems(HorizontalAlign.Start)
@@ -397,7 +412,7 @@ export struct PostDetailScreen {
                       if (!item.is_accepted && this.post?.author_id) {
                         Text('采纳')
                           .fontSize(11)
-                          .fontColor(DeepColors.Success)
+                          .fontColor(DeepColors.ACCENT_SUCCESS)
                           .margin({ right: 10 })
                           .onClick(() => this.handleAcceptComment(item))
                       }
@@ -405,20 +420,29 @@ export struct PostDetailScreen {
                       // 置顶操作入口
                       Text(item.is_featured ? '取消置顶' : '置顶')
                         .fontSize(11)
-                        .fontColor('#F59E0B')
+                        .fontColor(DeepColors.ACCENT_GOLD)
+                        .margin({ right: 10 })
                         .onClick(() => this.handleFeatureComment(item))
+
+                      // 评论违规举报入口
+                      Text('举报')
+                        .fontSize(10)
+                        .fontColor(DeepColors.TEXT_TERTIARY)
+                        .onClick(() => {
+                          this.openReport('comment', item.id);
+                        })
                     }
                     .width('100%')
 
                     Text(item.content)
                       .fontSize(13)
-                      .fontColor(DeepColors.TextSecondary)
+                      .fontColor(DeepColors.TEXT_SECONDARY)
                       .lineHeight(18)
                       .margin({ left: 40, top: 6 })
                   }
                   .width('100%')
                   .padding({ left: 16, right: 16, top: 10, bottom: 10 })
-                  .border({ width: { bottom: 0.6 }, color: DeepColors.GlassBorder })
+                  .border({ width: { bottom: 0.6 }, color: 'rgba(255, 255, 255, 0.06)' })
                 }
               }, (item: CommentItem) => item.id)
             }
@@ -435,14 +459,29 @@ export struct PostDetailScreen {
       .width('100%')
       .height('100%')
 
-      // 底部评论输入悬浮条
+      // 底部评论输入悬浮条 (沉浸光感)
       Row() {
+        // 表情包面板微按键
+        Button({ type: ButtonType.Circle }) {
+          SymbolGlyph($r('sys.symbol.face_smile'))
+            .fontSize(18)
+            .fontColor([DeepColors.TEXT_SECONDARY])
+        }
+        .width(36)
+        .height(36)
+        .backgroundColor('rgba(255, 255, 255, 0.05)')
+        .margin({ right: 8 })
+        .onClick(() => {
+          this.showStickerSheet = true;
+        })
+
         TextInput({ text: this.commentInput, placeholder: '写下你的见解...' })
-          .placeholderColor(DeepColors.TextTertiary)
-          .fontColor(DeepColors.TextPrimary)
+          .placeholderColor(DeepColors.TEXT_TERTIARY)
+          .fontColor(DeepColors.TEXT_PRIMARY)
           .fontSize(13)
           .height(38)
-          .backgroundColor(DeepColors.SurfaceRaised)
+          .backgroundColor('rgba(28, 28, 30, 0.75)')
+          .border({ width: 0.8, color: 'rgba(255, 255, 255, 0.08)' })
           .borderRadius(19)
           .padding({ left: 14, right: 14 })
           .layoutWeight(1)
@@ -452,50 +491,50 @@ export struct PostDetailScreen {
 
         Button(this.isSubmittingComment ? '...' : '发送')
           .fontSize(12)
-          .fontColor(DeepColors.TextPrimary)
+          .fontColor(Color.White)
           .height(34)
           .padding({ left: 16, right: 16 })
           .borderRadius(17)
-          .backgroundColor(DeepColors.Primary)
+          .backgroundColor(DeepColors.PRIMARY)
           .margin({ left: 10 })
           .onClick(() => this.handleSendComment())
       }
       .width('100%')
       .padding({ left: 16, right: 16, top: 10, bottom: 12 })
-      .backgroundColor(DeepColors.Surface)
-      .border({ width: { top: 0.6 }, color: DeepColors.GlassBorder })
+      .backgroundBlurStyle(BlurStyle.Thin, { colorMode: ThemeColorMode.DARK })
+      .border({ width: { top: 0.6 }, color: 'rgba(255, 255, 255, 0.08)' })
 
       // 他人主页半屏抽屉
       UserProfileSheet({
         userId: this.selectedUserId,
-        visible: this.showUserSheet,
         onClose: () => {
           this.showUserSheet = false;
         }
       })
+      .visibility(this.showUserSheet ? Visibility.Visible : Visibility.None)
 
-      // 举报违规弹窗
+      // 举报违规弹窗 (支持帖子与评论举报)
       if (this.showReportDialog) {
         Stack() {
           Column() {
-            Text('举报此内容')
+            Text(this.reportTargetType === 'post' ? '举报违规帖子' : '举报违规评论')
               .fontSize(16)
               .fontWeight(FontWeight.Bold)
-              .fontColor(DeepColors.TextPrimary)
+              .fontColor(DeepColors.TEXT_PRIMARY)
               .width('100%')
 
             Text('请如实描述违规行为（垃圾广告/涉政涉黄/人身攻击等）')
               .fontSize(12)
-              .fontColor(DeepColors.TextTertiary)
+              .fontColor(DeepColors.TEXT_TERTIARY)
               .width('100%')
               .margin({ top: 4, bottom: 12 })
 
             TextArea({ text: this.reportReason, placeholder: '输入具体原因...' })
-              .placeholderColor(DeepColors.TextTertiary)
-              .fontColor(DeepColors.TextPrimary)
+              .placeholderColor(DeepColors.TEXT_TERTIARY)
+              .fontColor(DeepColors.TEXT_PRIMARY)
               .fontSize(13)
               .height(90)
-              .backgroundColor(DeepColors.SurfaceRaised)
+              .backgroundColor('rgba(28, 28, 30, 0.85)')
               .borderRadius(8)
               .onChange((val) => {
                 this.reportReason = val;
@@ -504,7 +543,7 @@ export struct PostDetailScreen {
             Row() {
               Button('取消')
                 .fontSize(13)
-                .fontColor(DeepColors.TextSecondary)
+                .fontColor(DeepColors.TEXT_SECONDARY)
                 .backgroundColor(Color.Transparent)
                 .onClick(() => {
                   this.showReportDialog = false;
@@ -512,8 +551,8 @@ export struct PostDetailScreen {
 
               Button('提交举报')
                 .fontSize(13)
-                .fontColor(DeepColors.TextPrimary)
-                .backgroundColor('#EF4444')
+                .fontColor(Color.White)
+                .backgroundColor(DeepColors.ACCENT_ERROR)
                 .margin({ left: 12 })
                 .onClick(() => this.handleSubmitReport())
             }
@@ -523,18 +562,33 @@ export struct PostDetailScreen {
           }
           .width('88%')
           .padding(18)
-          .borderRadius(14)
-          .backgroundColor(DeepColors.Surface)
-          .border({ width: 0.6, color: DeepColors.GlassBorder, radius: 14 })
+          .borderRadius(16)
+          .backgroundColor('rgba(20, 20, 22, 0.95)')
+          .border({ width: 0.8, color: 'rgba(255, 255, 255, 0.1)', radius: 16 })
         }
         .width('100%')
         .height('100%')
-        .backgroundColor('#80000000')
+        .backgroundColor('rgba(0, 0, 0, 0.65)')
         .alignment(Alignment.Center)
       }
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(DeepColors.Background)
+    .backgroundColor(DeepColors.BACKGROUND)
+    .bindSheet($$this.showStickerSheet, this.StickerSheetBuilder(), {
+      height: SheetSize.MEDIUM,
+      dragBar: true,
+      backgroundColor: DeepColors.SURFACE
+    })
+  }
+
+  @Builder
+  StickerSheetBuilder() {
+    StickerManageSheet({
+      onSelectSticker: (url: string) => {
+        this.commentInput = url;
+        this.showStickerSheet = false;
+      }
+    })
   }
 }

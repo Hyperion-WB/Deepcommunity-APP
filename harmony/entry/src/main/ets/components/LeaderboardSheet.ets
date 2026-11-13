@@ -1,10 +1,11 @@
 import { LeaderboardItem } from '../model/PostModels';
 import { Constants, DeepColors } from '../common/Constants';
 import { HttpUtils } from '../common/HttpUtils';
+import { HeatmapView } from './HeatmapView';
 
 /**
  * 鸿蒙全站活跃榜与签到热力图抽屉 (LeaderboardSheet ArkUI)
- * 金属微徽章排印 (金/银/铜)，支持连续签到、早鸟与活跃排行榜
+ * 金属微徽章排印 (金/银/铜)，支持连续签到、早鸟与活跃排行榜，以及社区热力图
  */
 @Component
 export struct LeaderboardSheet {
@@ -23,9 +24,11 @@ export struct LeaderboardSheet {
     this.isLoading = true;
     try {
       const res = await HttpUtils.get<Record<string, LeaderboardItem[]>>('api/posts/leaderboards');
-      this.streakList = res.streak || [];
-      this.earlyList = res.early || [];
-      this.activeList = res.active || [];
+      if (res.isSuccess && res.data) {
+        this.streakList = res.data.streak || [];
+        this.earlyList = res.data.early || [];
+        this.activeList = res.data.active || [];
+      }
     } catch (e) {
       console.error('Failed to load leaderboards: ' + JSON.stringify(e));
     } finally {
@@ -44,11 +47,18 @@ export struct LeaderboardSheet {
         .margin({ top: 12, bottom: 12 })
 
       // 标题
-      Text('全站排行榜')
+      Text('全站排行榜与热力图')
         .fontSize(18)
         .fontWeight(FontWeight.Bold)
         .fontColor(DeepColors.TEXT_PRIMARY)
-        .margin({ bottom: 14 })
+        .margin({ bottom: 12 })
+
+      // 极客活跃绿格子热力图
+      HeatmapView({
+        totalActiveDays: 86,
+        totalContributions: 312
+      })
+      .margin({ left: 16, right: 16, bottom: 14 })
 
       // 榜单 Tab 药丸切换
       Row({ space: 8 }) {
@@ -114,8 +124,8 @@ export struct LeaderboardSheet {
               .width('100%')
               .padding({ left: 14, right: 14, top: 10, bottom: 10 })
               .borderRadius(14)
-              .backgroundColor(DeepColors.SURFACE_ELEVATED)
-              .border({ width: 0.6, color: DeepColors.BORDER })
+              .backgroundColor('rgba(28, 28, 30, 0.55)')
+              .border({ width: 0.6, color: 'rgba(255, 255, 255, 0.06)', radius: 14 })
               .onClick(() => {
                 this.onUserClick(item.username, item.user_id);
               })
@@ -128,8 +138,8 @@ export struct LeaderboardSheet {
       }
     }
     .width('100%')
-    .height('68%')
-    .backgroundColor(DeepColors.SURFACE)
+    .height('85%')
+    .backgroundBlurStyle(BlurStyle.Regular, { colorMode: ThemeColorMode.DARK })
     .borderRadius({ topLeft: 24, topRight: 24 })
   }
 

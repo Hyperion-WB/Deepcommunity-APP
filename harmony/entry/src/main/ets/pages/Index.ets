@@ -33,12 +33,12 @@ struct Index {
 
   async refreshUnreadStats() {
     // 获取未读消息与通知统计
-    const notifRes = await HttpUtils.get<{ unread_count: number }>('/notifications/unread-count');
+    const notifRes = await HttpUtils.get<{ unread_count: number }>('api/notifications/unread-count');
     if (notifRes.isSuccess && notifRes.data) {
       this.unreadNotificationCount = notifRes.data.unread_count;
     }
 
-    const msgRes = await HttpUtils.get<{ unread_count: number }>('/chat/unread-total');
+    const msgRes = await HttpUtils.get<{ unread_count: number }>('api/chat/unread-total');
     if (msgRes.isSuccess && msgRes.data) {
       this.unreadMessageCount = msgRes.data.unread_count;
     }
@@ -54,7 +54,7 @@ struct Index {
       return;
     }
     this.isSubmittingPost = true;
-    const res = await HttpUtils.post<{ id: string }>('/posts', {
+    const res = await HttpUtils.post<{ id: string }>('api/posts', {
       title: this.newPostTitle.trim(),
       content_md: this.newPostContent.trim(),
       category_id: 1,
@@ -92,13 +92,14 @@ struct Index {
         // Tab 1: 会话
         TabContent() {
           ConversationListScreen({
-            onConversationClick: (convId: string, isGroup: boolean) => {
+            onConversationClick: (convId: string, isGroup: boolean, title: string) => {
               router.pushUrl({
                 url: 'pages/ChatScreen',
                 params: {
                   roomId: isGroup ? convId : undefined,
                   peerUserId: isGroup ? undefined : convId,
-                  title: isGroup ? '群聊讨论' : '私聊'
+                  title: title,
+                  isGroup: isGroup
                 }
               });
             }
@@ -150,7 +151,7 @@ struct Index {
         }
       })
 
-      // 快速发帖弹窗
+      // 快速发帖弹窗 (沉浸光感)
       if (this.showCreatePostDialog) {
         Stack() {
           Column() {
@@ -158,39 +159,46 @@ struct Index {
               Text('发布新动态')
                 .fontSize(16)
                 .fontWeight(FontWeight.Bold)
-                .fontColor(DeepColors.TextPrimary)
+                .fontColor(DeepColors.TEXT_PRIMARY)
 
               Blank()
 
-              Text('✕')
-                .fontSize(16)
-                .fontColor(DeepColors.TextTertiary)
-                .onClick(() => {
-                  this.showCreatePostDialog = false;
-                })
+              Button({ type: ButtonType.Circle }) {
+                Text('×')
+                  .fontSize(16)
+                  .fontColor(DeepColors.TEXT_TERTIARY)
+              }
+              .width(28)
+              .height(28)
+              .backgroundColor('rgba(255, 255, 255, 0.06)')
+              .onClick(() => {
+                this.showCreatePostDialog = false;
+              })
             }
             .width('100%')
             .margin({ bottom: 12 })
 
             TextInput({ text: this.newPostTitle, placeholder: '动态标题...' })
-              .placeholderColor(DeepColors.TextTertiary)
-              .fontColor(DeepColors.TextPrimary)
+              .placeholderColor(DeepColors.TEXT_TERTIARY)
+              .fontColor(DeepColors.TEXT_PRIMARY)
               .fontSize(14)
               .height(42)
-              .backgroundColor(DeepColors.SurfaceRaised)
-              .borderRadius(8)
+              .backgroundColor('rgba(28, 28, 30, 0.85)')
+              .border({ width: 0.8, color: 'rgba(255, 255, 255, 0.08)' })
+              .borderRadius(10)
               .margin({ bottom: 10 })
               .onChange((val) => {
                 this.newPostTitle = val;
               })
 
             TextArea({ text: this.newPostContent, placeholder: '分享新鲜技术与社区见解...' })
-              .placeholderColor(DeepColors.TextTertiary)
-              .fontColor(DeepColors.TextPrimary)
+              .placeholderColor(DeepColors.TEXT_TERTIARY)
+              .fontColor(DeepColors.TEXT_PRIMARY)
               .fontSize(13)
               .height(130)
-              .backgroundColor(DeepColors.SurfaceRaised)
-              .borderRadius(8)
+              .backgroundColor('rgba(28, 28, 30, 0.85)')
+              .border({ width: 0.8, color: 'rgba(255, 255, 255, 0.08)' })
+              .borderRadius(10)
               .margin({ bottom: 14 })
               .onChange((val) => {
                 this.newPostContent = val;
@@ -199,7 +207,7 @@ struct Index {
             Row() {
               Button('取消')
                 .fontSize(13)
-                .fontColor(DeepColors.TextSecondary)
+                .fontColor(DeepColors.TEXT_SECONDARY)
                 .backgroundColor(Color.Transparent)
                 .onClick(() => {
                   this.showCreatePostDialog = false;
@@ -207,8 +215,11 @@ struct Index {
 
               Button(this.isSubmittingPost ? '发布中...' : '立即发布')
                 .fontSize(13)
-                .fontColor(DeepColors.TextPrimary)
-                .backgroundColor(DeepColors.Primary)
+                .fontColor(Color.White)
+                .backgroundColor(DeepColors.PRIMARY)
+                .height(36)
+                .padding({ left: 16, right: 16 })
+                .borderRadius(18)
                 .margin({ left: 12 })
                 .onClick(() => this.handlePublishPost())
             }
@@ -217,19 +228,19 @@ struct Index {
           }
           .width('90%')
           .padding(20)
-          .borderRadius(16)
-          .backgroundColor(DeepColors.Surface)
-          .border({ width: 0.8, color: DeepColors.GlassBorder, radius: 16 })
+          .borderRadius(20)
+          .backgroundColor('rgba(20, 20, 22, 0.95)')
+          .border({ width: 0.8, color: 'rgba(255, 255, 255, 0.1)', radius: 20 })
         }
         .width('100%')
         .height('100%')
-        .backgroundColor('#99000000')
+        .backgroundColor('rgba(0, 0, 0, 0.65)')
         .alignment(Alignment.Center)
       }
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(DeepColors.Background)
+    .backgroundColor(DeepColors.BACKGROUND)
     // 沉浸式拓扑拓展至系统状态栏与导航栏
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
   }

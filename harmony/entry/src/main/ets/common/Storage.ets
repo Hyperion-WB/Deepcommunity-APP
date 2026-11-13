@@ -64,3 +64,28 @@ export class StorageManager {
     }
   }
 }
+
+/**
+ * 静态快捷代理
+ */
+export class Storage {
+  static async getUser(): Promise<UserProfile | null> {
+    return StorageManager.getInstance().getUser();
+  }
+
+  static async setUser(user: UserProfile | null): Promise<void> {
+    await StorageManager.getInstance().setUser(user);
+  }
+
+  static getToken(): string {
+    return StorageManager.getInstance().getToken();
+  }
+
+  static async setToken(token: string): Promise<void> {
+    await StorageManager.getInstance().setToken(token);
+  }
+
+  static async clearToken(): Promise<void> {
+    await StorageManager.getInstance().clear();
+  }
+}

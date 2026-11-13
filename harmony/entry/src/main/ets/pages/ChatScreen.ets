@@ -3,6 +3,7 @@ import { Constants, DeepColors } from '../common/Constants';
 import { HttpUtils } from '../common/HttpUtils';
 import { StorageManager } from '../common/Storage';
 import { DiceCube } from '../components/DiceCube';
+import { StickerManageSheet } from '../components/StickerManageSheet';
 import router from '@ohos.router';
 import promptAction from '@ohos.promptAction';
 
@@ -12,7 +13,9 @@ import promptAction from '@ohos.promptAction';
  * 1. 顶部悬浮「定位到未读消息」智能胶囊 (jumpToUnread)
  * 2. 往上滑动自动翻页加载更早历史聊天记录 (loadOlderHistory)
  * 3. 仿生 3D 物理旋转象牙骰子 (DiceCube)
- * 4. 右下角「回到最新」浮动按键
+ * 4. 表情包管理与快捷发送 (StickerManageSheet)
+ * 5. 右下角「回到最新」浮动按键
+ * 6. 鸿蒙官方沉浸光感渲染 (backgroundBlurStyle)
  */
 @Entry
 @Component
@@ -32,13 +35,14 @@ export struct ChatScreen {
   @State isLoadingOlder: boolean = false;
   @State isJumpingToUnread: boolean = false;
   @State showScrollToBottom: boolean = false;
+  @State showStickerSheet: boolean = false;
 
   private scroller: Scroller = new Scroller();
 
   aboutToAppear() {
     const params = router.getParams() as Record<string, Object>;
     if (params) {
-      this.roomId = (params.id as string) || '';
+      this.roomId = (params.id as string) || (params.roomId as string) || '';
       this.isGroupChat = !!params.isGroup;
       this.chatTitle = (params.title as string) || '会话详情';
       this.unreadAtEntry = (params.unread as number) || 0;
@@ -56,9 +60,9 @@ export struct ChatScreen {
     try {
       const endpoint = this.isGroupChat ? `api/chat/groups/${this.roomId}/messages` : `api/chat/${this.roomId}/messages`;
       const res = await HttpUtils.get<ChatMessageItem[]>(endpoint, { page: 1, size: 50 });
-      this.messages = res || [];
+      this.messages = (res.isSuccess && res.data) ? res.data : [];
       this.currentPage = 1;
-      this.hasMoreHistory = (res && res.length >= 50);
+      this.hasMoreHistory = (this.messages.length >= 50);
 
       // 进入后自动标记已读
       const markEndpoint = this.isGroupChat ? `api/chat/groups/${this.roomId}/read` : `api/chat/conversations/${this.roomId}/read`;
@@ -84,7 +88,8 @@ export struct ChatScreen {
     const nextPage = this.currentPage + 1;
     try {
       const endpoint = this.isGroupChat ? `api/chat/groups/${this.roomId}/messages` : `api/chat/${this.roomId}/messages`;
-      const older = await HttpUtils.get<ChatMessageItem[]>(endpoint, { page: nextPage, size: 50 });
+      const res = await HttpUtils.get<ChatMessageItem[]>(endpoint, { page: nextPage, size: 50 });
+      const older = (res.isSuccess && res.data) ? res.data : [];
       if (!older || older.length === 0) {
         this.hasMoreHistory = false;
       } else {
@@ -112,7 +117,7 @@ export struct ChatScreen {
         await this.loadOlderHistory();
       }
 
-      // 计算目标索引并滚动定位
+      // 计算目标索引并平滑滚动定位
       const targetIndex = Math.max(0, this.messages.length - this.unreadAtEntry);
       this.scroller.scrollToIndex(targetIndex);
       this.unreadAtEntry = 0;
@@ -131,9 +136,9 @@ export struct ChatScreen {
 
     try {
       const endpoint = this.isGroupChat ? `api/chat/groups/${this.roomId}/messages` : `api/chat/${this.roomId}/messages`;
-      const newMsg = await HttpUtils.post<ChatMessageItem>(endpoint, { content, msg_type: 'text' });
-      if (newMsg && newMsg.id) {
-        this.messages.push(newMsg);
+      const res = await HttpUtils.post<ChatMessageItem>(endpoint, { content, msg_type: 'text' });
+      if (res.isSuccess && res.data && res.data.id) {
+        this.messages.push(res.data);
         this.scroller.scrollEdge(Edge.Bottom);
       }
     } catch (err) {
@@ -145,8 +150,8 @@ export struct ChatScreen {
     if (!this.isGroupChat) return;
     try {
       const res = await HttpUtils.post<ChatMessageItem>(`api/chat/groups/${this.roomId}/dice`);
-      if (res && res.id) {
-        this.messages.push(res);
+      if (res.isSuccess && res.data && res.data.id) {
+        this.messages.push(res.data);
         this.scroller.scrollEdge(Edge.Bottom);
       }
     } catch (err) {
@@ -157,33 +162,34 @@ export struct ChatScreen {
   build() {
     Stack({ alignContent: Alignment.TopCenter }) {
       Column() {
-        // 1. 沉浸式顶栏
+        // 1. 沉浸式顶栏 (backgroundBlurStyle)
         Row() {
           Button({ type: ButtonType.Circle }) {
             SymbolGlyph($r('sys.symbol.chevron_left'))
-              .fontSize(22)
+              .fontSize(20)
               .fontColor([DeepColors.TEXT_PRIMARY])
           }
-          .width(38)
-          .height(38)
-          .backgroundColor(Color.Transparent)
+          .width(36)
+          .height(36)
+          .backgroundColor('rgba(28, 28, 30, 0.65)')
+          .border({ width: 0.8, color: 'rgba(255, 255, 255, 0.08)' })
           .onClick(() => {
             router.back();
           })
 
           Text(this.chatTitle)
-            .fontSize(17)
+            .fontSize(16)
             .fontWeight(FontWeight.Bold)
             .fontColor(DeepColors.TEXT_PRIMARY)
             .layoutWeight(1)
-            .margin({ left: 6 })
+            .margin({ left: 10 })
 
-          // 右侧互动快捷键
+          // 右侧互动快捷键：3D 摇骰子
           if (this.isGroupChat) {
             Button({ type: ButtonType.Capsule }) {
               Row({ space: 4 }) {
                 SymbolGlyph($r('sys.symbol.dice_fill'))
-                  .fontSize(15)
+                  .fontSize(14)
                   .fontColor([DeepColors.PRIMARY])
                 Text('摇骰子')
                   .fontSize(11)
@@ -194,15 +200,16 @@ export struct ChatScreen {
             .height(30)
             .padding({ left: 10, right: 10 })
             .backgroundColor('rgba(59, 130, 246, 0.12)')
+            .border({ width: 0.6, color: 'rgba(59, 130, 246, 0.3)' })
             .onClick(() => {
               this.rollDice();
             })
           }
         }
         .width('100%')
-        .padding({ left: 12, right: 16, top: 44, bottom: 10 })
-        .backgroundColor(DeepColors.SURFACE)
-        .border({ width: { bottom: 0.6 }, color: DeepColors.BORDER })
+        .padding({ left: 14, right: 16, top: 40, bottom: 10 })
+        .backgroundBlurStyle(BlurStyle.Thin, { colorMode: ThemeColorMode.DARK })
+        .border({ width: { bottom: 0.6 }, color: 'rgba(255, 255, 255, 0.08)' })
 
         // 2. 消息流视口
         Stack({ alignContent: Alignment.BottomEnd }) {
@@ -221,10 +228,10 @@ export struct ChatScreen {
             } else if (this.hasMoreHistory && this.messages.length > 0) {
               ListItem() {
                 Row() {
-                  Text('加载更早的消息')
-                    .fontSize(12)
+                  Text('加载更早的历史记录')
+                    .fontSize(11)
                     .fontColor(DeepColors.PRIMARY)
-                    .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                    .padding({ left: 12, right: 12, top: 5, bottom: 5 })
                     .borderRadius(12)
                     .backgroundColor('rgba(59, 130, 246, 0.08)')
                     .border({ width: 0.6, color: 'rgba(59, 130, 246, 0.2)' })
@@ -259,7 +266,7 @@ export struct ChatScreen {
             this.showScrollToBottom = (total > 8 && first < total - 6);
           })
 
-          // 右下角「回到最新」浮动按键
+          // 右下角「回到最新」浮动按键 (沉浸光感微胶囊)
           if (this.showScrollToBottom) {
             Button({ type: ButtonType.Capsule }) {
               Row({ space: 4 }) {
@@ -274,10 +281,10 @@ export struct ChatScreen {
             .height(32)
             .padding({ left: 10, right: 10 })
             .borderRadius(16)
-            .backgroundColor(DeepColors.SURFACE_ELEVATED)
-            .border({ width: 0.8, color: DeepColors.BORDER })
+            .backgroundColor('rgba(28, 28, 30, 0.85)')
+            .border({ width: 0.8, color: 'rgba(255, 255, 255, 0.12)' })
             .margin({ right: 16, bottom: 16 })
-            .shadow({ radius: 8, color: 'rgba(0,0,0,0.3)', offsetY: 4 })
+            .shadow({ radius: 10, color: 'rgba(0, 0, 0, 0.45)', offsetY: 4 })
             .onClick(() => {
               this.scroller.scrollEdge(Edge.Bottom);
               this.showScrollToBottom = false;
@@ -287,13 +294,27 @@ export struct ChatScreen {
         .layoutWeight(1)
         .width('100%')
 
-        // 3. 底部输入控制条
+        // 3. 底部输入控制条 (沉浸光感)
         Row({ space: 8 }) {
+          // 表情包入口
+          Button({ type: ButtonType.Circle }) {
+            SymbolGlyph($r('sys.symbol.face_smile'))
+              .fontSize(18)
+              .fontColor([DeepColors.TEXT_SECONDARY])
+          }
+          .width(38)
+          .height(38)
+          .backgroundColor('rgba(255, 255, 255, 0.05)')
+          .onClick(() => {
+            this.showStickerSheet = true;
+          })
+
           TextInput({ text: this.inputText, placeholder: '发送消息…' })
             .layoutWeight(1)
             .height(40)
             .borderRadius(14)
-            .backgroundColor(DeepColors.SURFACE_ELEVATED)
+            .backgroundColor('rgba(28, 28, 30, 0.75)')
+            .border({ width: 0.8, color: 'rgba(255, 255, 255, 0.08)' })
             .fontColor(DeepColors.TEXT_PRIMARY)
             .placeholderColor(DeepColors.TEXT_TERTIARY)
             .onChange((val) => {
@@ -317,14 +338,14 @@ export struct ChatScreen {
         }
         .width('100%')
         .padding({ left: 14, right: 14, top: 8, bottom: 20 })
-        .backgroundColor(DeepColors.SURFACE)
-        .border({ width: { top: 0.6 }, color: DeepColors.BORDER })
+        .backgroundBlurStyle(BlurStyle.Thin, { colorMode: ThemeColorMode.DARK })
+        .border({ width: { top: 0.6 }, color: 'rgba(255, 255, 255, 0.08)' })
       }
       .width('100%')
       .height('100%')
       .backgroundColor(DeepColors.BACKGROUND)
 
-      // 4. 顶部未读消息定位胶囊 (jumpToUnread，对齐 Web 端)
+      // 4. 顶部未读消息定位胶囊 (jumpToUnread，沉浸光感)
       if (this.unreadAtEntry > 0) {
         Row({ space: 8 }) {
           Row({ space: 6 }) {
@@ -357,91 +378,131 @@ export struct ChatScreen {
         .padding({ left: 14, right: 10, top: 7, bottom: 7 })
         .borderRadius(20)
         .backgroundColor(DeepColors.PRIMARY)
-        .shadow({ radius: 12, color: 'rgba(0, 0, 0, 0.35)', offsetY: 4 })
-        .margin({ top: 96 })
+        .border({ width: 0.8, color: 'rgba(255, 255, 255, 0.25)' })
+        .shadow({ radius: 14, color: 'rgba(59, 130, 246, 0.45)', offsetY: 4 })
+        .margin({ top: 92 })
       }
     }
     .width('100%')
     .height('100%')
+    .bindSheet($$this.showStickerSheet, this.StickerSheetBuilder(), {
+      height: SheetSize.MEDIUM,
+      dragBar: true,
+      backgroundColor: DeepColors.SURFACE
+    })
+  }
+
+  @Builder
+  StickerSheetBuilder() {
+    StickerManageSheet({
+      onSelectSticker: (url: string) => {
+        this.sendMessage(url);
+        this.showStickerSheet = false;
+      }
+    })
   }
 
   @Builder
   ChatMessageBubble(msg: ChatMessageItem) {
     Row() {
       if (msg.sender_id === this.currentUserId) {
-        // 我发送的消息：右侧靠齐
-        Row({ space: 8 }) {
-          Blank()
-          Column({ space: 4 }) {
-            if (msg.content.includes('[骰子]')) {
-              // 提取骰子点数
-              DiceCube({ targetPoint: 6 })
-            } else {
-              Text(msg.content)
-                .fontSize(14)
-                .fontColor(Color.White)
-                .lineHeight(20)
-                .padding({ left: 14, right: 14, top: 10, bottom: 10 })
-                .borderRadius(16)
-                .backgroundColor(DeepColors.PRIMARY)
-            }
+        // 我方发言 (居右)
+        Blank()
+        Column({ space: 3 }) {
+          if (msg.msg_type === 'dice') {
+            DiceCube({ value: msg.dice_value || 6, isRolling: false })
+          } else if (msg.content.startsWith('http://') || msg.content.startsWith('https://')) {
+            Image(msg.content)
+              .width(130)
+              .height(130)
+              .borderRadius(10)
+              .objectFit(ImageFit.Contain)
+              .backgroundColor('rgba(255, 255, 255, 0.04)')
+          } else {
+            Text(msg.content)
+              .fontSize(14)
+              .fontColor(Color.White)
+              .lineHeight(20)
+              .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+              .borderRadius({ topLeft: 16, topRight: 4, bottomLeft: 16, bottomRight: 16 })
+              .backgroundColor(DeepColors.PRIMARY)
           }
-          .alignItems(HorizontalAlign.End)
 
-          Image(Constants.formatImageUrl(msg.sender_avatar))
-            .width(36)
-            .height(36)
-            .borderRadius(18)
-            .objectFit(ImageFit.Cover)
-            .alt($r('sys.media.ohos_ic_public_user_head'))
+          Text(msg.created_at || '刚刚')
+            .fontSize(10)
+            .fontColor(DeepColors.TEXT_TERTIARY)
+            .margin({ top: 2 })
         }
-        .width('100%')
-        .justifyContent(FlexAlign.End)
-      } else {
-        // 他人发送的消息：左侧靠齐
-        Row({ space: 8 }) {
-          Image(Constants.formatImageUrl(msg.sender_avatar))
-            .width(36)
-            .height(36)
-            .borderRadius(18)
-            .objectFit(ImageFit.Cover)
-            .alt($r('sys.media.ohos_ic_public_user_head'))
+        .alignItems(HorizontalAlign.End)
 
-          Column({ space: 4 }) {
-            Row({ space: 6 }) {
-              Text(msg.sender_nickname || msg.sender_username)
-                .fontSize(12)
-                .fontColor(DeepColors.TEXT_TERTIARY)
+        Image(Constants.formatImageUrl(msg.sender_avatar))
+          .width(36)
+          .height(36)
+          .borderRadius(18)
+          .margin({ left: 10 })
+          .backgroundColor('rgba(255, 255, 255, 0.05)')
+          .border({ width: 1, color: 'rgba(255, 255, 255, 0.12)' })
+          .alt('')
+      } else {
+        // 对方发言 (居左)
+        Image(Constants.formatImageUrl(msg.sender_avatar))
+          .width(36)
+          .height(36)
+          .borderRadius(18)
+          .margin({ right: 10 })
+          .backgroundColor('rgba(255, 255, 255, 0.05)')
+          .border({ width: 1, color: 'rgba(255, 255, 255, 0.12)' })
+          .alt('')
+
+        Column({ space: 3 }) {
+          Row({ space: 6 }) {
+            Text(msg.sender_nickname || msg.sender_username || '居民')
+              .fontSize(12)
+              .fontWeight(FontWeight.SemiBold)
+              .fontColor(DeepColors.TEXT_SECONDARY)
+
+            // 防挤压微等级标签
+            Row() {
               Text(`Lv.${msg.sender_level || 1}`)
-                .fontSize(8)
+                .fontSize(9)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(DeepColors.PRIMARY)
-                .padding({ left: 4, right: 4, top: 1, bottom: 1 })
-                .borderRadius(4)
-                .backgroundColor('rgba(59, 130, 246, 0.12)')
             }
-
-            if (msg.content.includes('[骰子]')) {
-              DiceCube({ targetPoint: 6 })
-            } else {
-              Text(msg.content)
-                .fontSize(14)
-                .fontColor(DeepColors.TEXT_PRIMARY)
-                .lineHeight(20)
-                .padding({ left: 14, right: 14, top: 10, bottom: 10 })
-                .borderRadius(16)
-                .backgroundColor(DeepColors.SURFACE_ELEVATED)
-                .border({ width: 0.6, color: DeepColors.BORDER })
-            }
+            .padding({ left: 4, right: 4, top: 1, bottom: 1 })
+            .borderRadius(3)
+            .backgroundColor('rgba(59, 130, 246, 0.12)')
           }
-          .alignItems(HorizontalAlign.Start)
 
-          Blank()
+          if (msg.msg_type === 'dice') {
+            DiceCube({ value: msg.dice_value || 6, isRolling: false })
+          } else if (msg.content.startsWith('http://') || msg.content.startsWith('https://')) {
+            Image(msg.content)
+              .width(130)
+              .height(130)
+              .borderRadius(10)
+              .objectFit(ImageFit.Contain)
+              .backgroundColor('rgba(255, 255, 255, 0.04)')
+          } else {
+            Text(msg.content)
+              .fontSize(14)
+              .fontColor(DeepColors.TEXT_PRIMARY)
+              .lineHeight(20)
+              .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+              .borderRadius({ topLeft: 4, topRight: 16, bottomLeft: 16, bottomRight: 16 })
+              .backgroundColor('rgba(28, 28, 30, 0.75)')
+              .border({ width: 0.6, color: 'rgba(255, 255, 255, 0.08)' })
+          }
+
+          Text(msg.created_at || '刚刚')
+            .fontSize(10)
+            .fontColor(DeepColors.TEXT_TERTIARY)
+            .margin({ top: 2 })
         }
-        .width('100%')
-        .justifyContent(FlexAlign.Start)
+        .alignItems(HorizontalAlign.Start)
+        Blank()
       }
     }
     .width('100%')
+    .alignItems(VerticalAlign.Top)
   }
 }
