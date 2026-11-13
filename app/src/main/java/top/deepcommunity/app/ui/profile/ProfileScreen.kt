@@ -97,7 +97,8 @@ fun ProfileScreen(
     val pagerState = rememberPagerState(initialPage = uiState.selectedTab) { 2 }
     var followListTab by remember { mutableStateOf<Int?>(null) }
     var showPrivacyDndSheet by remember { mutableStateOf(false) }
-    var selectedOtherUserId by remember { mutableStateOf<Long?>(null) }
+    var selectedOtherUserId by remember { mutableStateOf<String?>(null) }
+    var selectedOtherUsername by remember { mutableStateOf<String?>(null) }
 
     // 左右滑动手势联动选中的 Tab
     LaunchedEffect(pagerState.currentPage) {
@@ -626,9 +627,9 @@ fun ProfileScreen(
                 initialTab = tabIndex,
                 userRepository = viewModel.userRepo,
                 onDismissRequest = { followListTab = null },
-                onUserClick = { uId ->
+                onUserClick = { userIdent ->
                     followListTab = null
-                    selectedOtherUserId = uId
+                    selectedOtherUsername = userIdent
                 }
             )
         }
@@ -642,11 +643,15 @@ fun ProfileScreen(
         }
 
         // 他人个人主页弹窗
-        selectedOtherUserId?.let { otherId ->
+        (selectedOtherUsername ?: selectedOtherUserId)?.let { _ ->
             UserProfileBottomSheet(
-                userId = otherId,
+                username = selectedOtherUsername,
+                userId = selectedOtherUserId,
                 userRepository = viewModel.userRepo,
-                onDismissRequest = { selectedOtherUserId = null }
+                onDismissRequest = {
+                    selectedOtherUserId = null
+                    selectedOtherUsername = null
+                }
             )
         }
     }

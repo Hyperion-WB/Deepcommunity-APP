@@ -498,10 +498,10 @@ fun PostDetailScreen(
                             )
 
                             // 附加相册九宫格图片展示
-                            if (post.imageUrls.isNotEmpty()) {
+                            if (!post.imageUrls.isNullOrEmpty()) {
                                 Spacer(modifier = Modifier.height(14.dp))
                                 PostDetailImageGallery(
-                                    images = post.imageUrls,
+                                    images = post.imageUrls!!,
                                     onImageClick = { previewImageUrl = it }
                                 )
                             }

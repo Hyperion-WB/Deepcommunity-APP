@@ -158,7 +158,8 @@ fun ChatScreen(
     var highlightedMsgId by remember { mutableStateOf<String?>(null) }
     var previewChatImageUrl by remember { mutableStateOf<String?>(null) }
     var showGroupRequestsSheet by remember { mutableStateOf(false) }
-    var selectedChatUserId by remember { mutableStateOf<Long?>(null) }
+    var selectedChatUserId by remember { mutableStateOf<String?>(null) }
+    var selectedChatUsername by remember { mutableStateOf<String?>(null) }
     var showDailyFortuneDialog by remember { mutableStateOf(false) }
     var showIdiomChainSheet by remember { mutableStateOf(false) }
 
@@ -510,7 +511,10 @@ fun ChatScreen(
                     },
                     onImageClick = { previewChatImageUrl = it },
                     onCollectSticker = viewModel::collectSticker,
-                    onUserClick = { uId -> selectedChatUserId = uId }
+                    onUserClick = { uName, uId ->
+                        selectedChatUsername = uName
+                        selectedChatUserId = uId
+                    }
                 )
             }
         }
@@ -588,11 +592,15 @@ fun ChatScreen(
         }
 
         // 他人个人主页弹窗
-        selectedChatUserId?.let { uId ->
+        (selectedChatUsername ?: selectedChatUserId)?.let { _ ->
             UserProfileBottomSheet(
-                userId = uId,
+                username = selectedChatUsername,
+                userId = selectedChatUserId,
                 userRepository = viewModel.userRepo,
-                onDismissRequest = { selectedChatUserId = null }
+                onDismissRequest = {
+                    selectedChatUserId = null
+                    selectedChatUsername = null
+                }
             )
         }
 
@@ -820,7 +828,7 @@ private fun ChatMessageBubble(
     onCopyClick: () -> Unit,
     onImageClick: (String) -> Unit = {},
     onCollectSticker: (String) -> Unit = {},
-    onUserClick: (Long) -> Unit = {}
+    onUserClick: (username: String?, userId: String?) -> Unit = { _, _ -> }
 ) {
     // 若消息已撤回
     if (message.isRecalled) {
@@ -882,7 +890,7 @@ private fun ChatMessageBubble(
                         interactionSource = avatarInteractionSource,
                         indication = null,
                         onClick = {
-                            message.senderId.toLongOrNull()?.let(onUserClick)
+                            onUserClick(message.senderUsername, message.senderId)
                         },
                         onLongClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)

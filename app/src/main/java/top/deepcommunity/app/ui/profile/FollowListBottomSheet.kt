@@ -62,7 +62,7 @@ fun FollowListBottomSheet(
     initialTab: Int = 0, // 0: 关注, 1: 粉丝
     userRepository: UserRepository,
     onDismissRequest: () -> Unit,
-    onUserClick: (Long) -> Unit
+    onUserClick: (String) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
@@ -219,7 +219,7 @@ fun FollowListBottomSheet(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { onUserClick(item.id.toLongOrNull() ?: 0L) }
+                                    .clickable { onUserClick(item.username.ifBlank { item.id }) }
                                     .padding(horizontal = 16.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
