@@ -12,10 +12,15 @@ import top.deepcommunity.app.data.model.ChatMessageDto
 import top.deepcommunity.app.data.model.CollectStickerRequest
 import top.deepcommunity.app.data.model.ConversationDto
 import top.deepcommunity.app.data.model.ErrorResponse
+import top.deepcommunity.app.data.model.FortuneResultDto
+import top.deepcommunity.app.data.model.FortuneStatusDto
 import top.deepcommunity.app.data.model.GroupApplyRequestDto
 import top.deepcommunity.app.data.model.GroupCheckinStatusDto
 import top.deepcommunity.app.data.model.GroupMemberDto
 import top.deepcommunity.app.data.model.GroupRoomDto
+import top.deepcommunity.app.data.model.IdiomAnswerRequest
+import top.deepcommunity.app.data.model.IdiomAnswerResponse
+import top.deepcommunity.app.data.model.IdiomChainStateDto
 import top.deepcommunity.app.data.model.KickMemberRequest
 import top.deepcommunity.app.data.model.MuteMemberRequest
 import top.deepcommunity.app.data.model.SendMessageRequest
@@ -404,6 +409,90 @@ class ChatRepository @Inject constructor(
                 emit(Resource.Success(response.body()?.message ?: "已拒绝入群申请"))
             } else {
                 emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "操作失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun getFortuneStatus(roomId: String): Flow<Resource<FortuneStatusDto>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.getFortuneStatus(roomId)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "获取求签状态失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun drawFortune(roomId: String): Flow<Resource<FortuneResultDto>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.drawFortune(roomId)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "求签失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun getIdiomChainState(roomId: String): Flow<Resource<IdiomChainStateDto>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.getIdiomChainState(roomId)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "获取成语接龙状态失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun startIdiomChain(roomId: String): Flow<Resource<IdiomChainStateDto>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.startIdiomChain(roomId)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "开局失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun answerIdiomChain(roomId: String, word: String): Flow<Resource<IdiomAnswerResponse>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.answerIdiomChain(roomId, IdiomAnswerRequest(word))
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "接龙提交失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun endIdiomChain(roomId: String): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.endIdiomChain(roomId)
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.message ?: "接龙已结束"))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "结束接龙失败"))
             }
         } catch (e: Exception) {
             emit(Resource.Error(e.localizedMessage ?: "网络错误"))

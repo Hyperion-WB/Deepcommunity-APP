@@ -229,7 +229,7 @@ class UserRepository @Inject constructor(
             if (response.isSuccessful) {
                 emit(Resource.Success(response.body()?.message ?: "已关注"))
             } else {
-                emit(Resource.Error("关注失败: ${response.code}"))
+                emit(Resource.Error("关注失败: ${response.code()}"))
             }
         } catch (e: Exception) {
             emit(Resource.Error(e.localizedMessage ?: "网络错误"))
@@ -243,7 +243,7 @@ class UserRepository @Inject constructor(
             if (response.isSuccessful) {
                 emit(Resource.Success(response.body()?.message ?: "已取消关注"))
             } else {
-                emit(Resource.Error("取消关注失败: ${response.code}"))
+                emit(Resource.Error("取消关注失败: ${response.code()}"))
             }
         } catch (e: Exception) {
             emit(Resource.Error(e.localizedMessage ?: "网络错误"))

@@ -53,6 +53,7 @@ import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Share
 import top.deepcommunity.app.ui.post.component.PostSharePosterDialog
+import top.deepcommunity.app.ui.post.component.QaBountyCard
 import top.deepcommunity.app.ui.post.component.ReportDialog
 import top.deepcommunity.app.ui.profile.UserProfileBottomSheet
 import androidx.compose.material3.DropdownMenu
@@ -469,6 +470,14 @@ fun PostDetailScreen(
                             }
 
                             Spacer(modifier = Modifier.height(16.dp))
+
+                            // 问答广场悬赏卡片
+                            uiState.qaState?.let { qa ->
+                                if (qa.isQa) {
+                                    QaBountyCard(qaState = qa)
+                                    Spacer(modifier = Modifier.height(14.dp))
+                                }
+                            }
 
                             // 标题
                             Text(

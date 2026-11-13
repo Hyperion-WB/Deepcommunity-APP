@@ -160,7 +160,7 @@ fun GroupRequestsBottomSheet(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             UserAvatar(
-                                avatarUrl = req.avatar,
+                                avatarUrl = req.avatarUrl,
                                 displayName = displayName,
                                 size = 44.dp
                             )
@@ -218,7 +218,7 @@ fun GroupRequestsBottomSheet(
                                     }
                                 },
                                 modifier = Modifier.height(32.dp),
-                                outlined = true
+                                isPrimary = false
                             )
 
                             Spacer(modifier = Modifier.width(6.dp))

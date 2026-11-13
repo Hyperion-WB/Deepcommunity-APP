@@ -23,6 +23,8 @@ import top.deepcommunity.app.data.model.LikeResponse
 import top.deepcommunity.app.data.model.MessageResponse
 import top.deepcommunity.app.data.model.NotificationDto
 import top.deepcommunity.app.data.model.PollCreateRequest
+import top.deepcommunity.app.data.model.QaQuestionStateDto
+import top.deepcommunity.app.data.model.QaSettleRequest
 import top.deepcommunity.app.data.model.PollDetailDto
 import top.deepcommunity.app.data.model.PollVoteRequest
 import top.deepcommunity.app.data.model.PostItemDto
@@ -151,4 +153,14 @@ interface PostApi {
     // 全站风云榜
     @GET("api/stats/leaderboards")
     suspend fun getLeaderboards(): Response<LeaderboardsResponse>
+
+    // 问答广场悬赏状态与结算
+    @GET("api/qa/posts/{post_id}")
+    suspend fun getQaQuestionState(@Path("post_id") postId: String): Response<QaQuestionStateDto>
+
+    @POST("api/qa/posts/{post_id}/settle")
+    suspend fun settleQaQuestion(
+        @Path("post_id") postId: String,
+        @Body request: QaSettleRequest
+    ): Response<MessageResponse>
 }

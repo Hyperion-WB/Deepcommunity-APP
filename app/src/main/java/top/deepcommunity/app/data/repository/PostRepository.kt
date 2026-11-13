@@ -23,6 +23,8 @@ import top.deepcommunity.app.data.model.PollDetailDto
 import top.deepcommunity.app.data.model.PollOptionCreateDto
 import top.deepcommunity.app.data.model.PollVoteRequest
 import top.deepcommunity.app.data.model.PostItemDto
+import top.deepcommunity.app.data.model.QaQuestionStateDto
+import top.deepcommunity.app.data.model.QaSettleRequest
 import top.deepcommunity.app.data.model.ReactionToggleRequest
 import top.deepcommunity.app.data.model.SaveDraftRequest
 import top.deepcommunity.app.data.model.SystemAnnouncementDto
@@ -469,6 +471,34 @@ class PostRepository @Inject constructor(
             }
         } catch (e: Exception) {
             emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun getQaQuestionState(postId: String): Flow<Resource<QaQuestionStateDto>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = postApi.getQaQuestionState(postId)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("获取问答状态失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun settleQaQuestion(postId: String, commentIds: List<String>): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = postApi.settleQaQuestion(postId, QaSettleRequest(commentIds))
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.message ?: "问答悬赏结算成功"))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string())))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "结算失败"))
         }
     }.flowOn(Dispatchers.IO)
 

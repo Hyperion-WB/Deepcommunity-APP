@@ -153,6 +153,8 @@ fun ChatScreen(
     var previewChatImageUrl by remember { mutableStateOf<String?>(null) }
     var showGroupRequestsSheet by remember { mutableStateOf(false) }
     var selectedChatUserId by remember { mutableStateOf<Long?>(null) }
+    var showDailyFortuneDialog by remember { mutableStateOf(false) }
+    var showIdiomChainSheet by remember { mutableStateOf(false) }
 
     // 相册选图发送
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -322,6 +324,34 @@ fun ChatScreen(
                     }
                 }
 
+                // 群互动快捷胶囊条 (群聊专属轻量高频互动)
+                if (uiState.isGroupChat) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        GroupActionChip(
+                            icon = "🎲",
+                            label = "掷骰子",
+                            loading = uiState.isRollingDice,
+                            onClick = { viewModel.rollDice() }
+                        )
+                        GroupActionChip(
+                            icon = "🥠",
+                            label = "每日求签",
+                            onClick = { showDailyFortuneDialog = true }
+                        )
+                        GroupActionChip(
+                            icon = "🐉",
+                            label = "成语接龙",
+                            onClick = { showIdiomChainSheet = true }
+                        )
+                    }
+                }
+
                 // 输入框工具栏
                 GlassBox(
                     shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
@@ -352,23 +382,6 @@ fun ChatScreen(
                                     tint = DeepTheme.extended.textSecondary,
                                     modifier = Modifier.size(22.dp)
                                 )
-                            }
-                        }
-
-                        // 摇骰子按钮（群聊专属互动）
-                        if (uiState.isGroupChat) {
-                            IconButton(
-                                onClick = {
-                                    viewModel.rollDice()
-                                },
-                                enabled = !uiState.isRollingDice,
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                if (uiState.isRollingDice) {
-                                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
-                                } else {
-                                    Text(text = "🎲", fontSize = 18.sp)
-                                }
                             }
                         }
 
@@ -576,6 +589,59 @@ fun ChatScreen(
                 onDismissRequest = { selectedChatUserId = null }
             )
         }
+
+        // 每日求签弹窗
+        if (showDailyFortuneDialog) {
+            DailyFortuneDialog(
+                roomId = viewModel.convId,
+                chatRepository = viewModel.chatRepo,
+                onDismissRequest = { showDailyFortuneDialog = false }
+            )
+        }
+
+        // 成语接龙抽屉
+        if (showIdiomChainSheet) {
+            IdiomChainBottomSheet(
+                roomId = viewModel.convId,
+                chatRepository = viewModel.chatRepo,
+                onDismissRequest = { showIdiomChainSheet = false }
+            )
+        }
+    }
+}
+
+@Composable
+private fun GroupActionChip(
+    icon: String,
+    label: String,
+    loading: Boolean = false,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(DeepTheme.extended.surfaceElevated.copy(alpha = 0.85f))
+            .border(1.dp, DeepTheme.extended.border.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+            .clickable(enabled = !loading, onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(12.dp),
+                strokeWidth = 1.5.dp,
+                color = MaterialTheme.colorScheme.primary
+            )
+        } else {
+            Text(text = icon, fontSize = 12.sp)
+        }
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            color = DeepTheme.extended.textSecondary,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 

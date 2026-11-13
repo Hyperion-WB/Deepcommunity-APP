@@ -22,6 +22,7 @@ import top.deepcommunity.app.core.common.Resource
 import top.deepcommunity.app.data.model.CommentDto
 import top.deepcommunity.app.data.model.PollDetailDto
 import top.deepcommunity.app.data.model.PostItemDto
+import top.deepcommunity.app.data.model.QaQuestionStateDto
 import top.deepcommunity.app.data.model.StickerItemDto
 import top.deepcommunity.app.data.repository.ChatRepository
 import top.deepcommunity.app.data.repository.PostRepository
@@ -46,6 +47,7 @@ data class PostDetailUiState(
     val stickers: List<StickerItemDto> = emptyList(),
     val attachedImageUrl: String? = null,
     val attachedImageKind: String? = null, // "photo" 或 "sticker"
+    val qaState: QaQuestionStateDto? = null,
     val errorMessage: String? = null
 )
 
@@ -78,6 +80,17 @@ class PostDetailViewModel @Inject constructor(
         loadPostDetail()
         loadComments()
         loadPoll()
+        loadQaState()
+    }
+
+    fun loadQaState() {
+        viewModelScope.launch {
+            postRepository.getQaQuestionState(postId).collect { res ->
+                if (res is Resource.Success) {
+                    _uiState.update { it.copy(qaState = res.data) }
+                }
+            }
+        }
     }
 
     fun loadPostDetail() {
@@ -452,11 +465,12 @@ class PostDetailViewModel @Inject constructor(
 
     fun acceptComment(commentId: Long) {
         viewModelScope.launch {
-            postRepository.acceptComment(postId = postId, commentId = commentId).collect { res ->
+            postRepository.acceptComment(commentId.toString()).collect { res ->
                 when (res) {
                     is Resource.Success -> {
                         _eventFlow.emit(PostDetailEvent.ShowToast("👑 已采纳该回答为最佳答案"))
                         loadComments()
+                        loadQaState()
                     }
                     is Resource.Error -> {
                         _eventFlow.emit(PostDetailEvent.ShowToast(res.message))
@@ -469,7 +483,7 @@ class PostDetailViewModel @Inject constructor(
 
     fun featureComment(commentId: Long) {
         viewModelScope.launch {
-            postRepository.featureComment(postId = postId, commentId = commentId).collect { res ->
+            postRepository.featureComment(commentId.toString()).collect { res ->
                 when (res) {
                     is Resource.Success -> {
                         _eventFlow.emit(PostDetailEvent.ShowToast("📌 已精选置顶该评论"))

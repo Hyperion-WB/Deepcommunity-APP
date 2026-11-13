@@ -50,17 +50,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import top.deepcommunity.app.core.common.Resource
-import top.deepcommunity.app.core.designsystem.component.DeepButton
 import top.deepcommunity.app.core.designsystem.component.GlassBox
 import top.deepcommunity.app.core.designsystem.component.UserAvatar
 import top.deepcommunity.app.core.designsystem.theme.LocalExtendedColors
 import top.deepcommunity.app.data.model.CheckinStatusDetailDto
-import top.deepcommunity.app.data.model.LeaderboardItemDto
 import top.deepcommunity.app.data.model.LeaderboardsResponse
 import top.deepcommunity.app.data.repository.PostRepository
 import top.deepcommunity.app.data.repository.UserRepository
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -153,15 +149,16 @@ fun LeaderboardsBottomSheet(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "连续 ${checkinStatus?.continuousDays ?: 0} 天 · 共打卡 ${checkinStatus?.totalDays ?: 0} 天",
+                                text = "连续 ${checkinStatus?.streak ?: 0} 天 · 最高 ${checkinStatus?.bestStreak ?: 0} 天",
                                 fontSize = 11.sp,
                                 color = extColors.textSecondary
                             )
                         }
 
-                        if ((checkinStatus?.makeupCards ?: 0) > 0) {
+                        val makeupCount = checkinStatus?.makeupLeft ?: 0
+                        if (makeupCount > 0) {
                             Text(
-                                text = "补签卡 ×${checkinStatus?.makeupCards}",
+                                text = "补签卡 ×$makeupCount",
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier
@@ -191,13 +188,8 @@ fun LeaderboardsBottomSheet(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     // 28格（近4周）极简热力图绿格子
-                    val checkinSet = remember(checkinStatus) {
-                        checkinStatus?.checkinDates?.toSet() ?: emptySet()
-                    }
-                    val today = remember { LocalDate.now() }
-                    val pastDays = remember(today) {
-                        (27 downTo 0).map { today.minusDays(it.toLong()) }
-                    }
+                    val streak = checkinStatus?.streak ?: 0
+                    val checkedToday = checkinStatus?.checkedToday == true
 
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
@@ -205,11 +197,9 @@ fun LeaderboardsBottomSheet(
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                         maxItemsInEachRow = 14
                     ) {
-                        pastDays.forEach { date ->
-                            val dateStr = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
-                            val isChecked = checkinSet.contains(dateStr)
-                            val isToday = date == today
-
+                        for (i in 27 downTo 0) {
+                            val isToday = i == 0
+                            val isChecked = if (isToday) checkedToday else (i < streak)
                             Box(
                                 modifier = Modifier
                                     .size(16.dp)
@@ -275,9 +265,9 @@ fun LeaderboardsBottomSheet(
                 }
             } else {
                 val currentList = when (selectedTab) {
-                    0 -> leaderboardsData?.continuous ?: emptyList()
-                    1 -> leaderboardsData?.earlyBird ?: emptyList()
-                    else -> leaderboardsData?.weekly ?: emptyList()
+                    0 -> leaderboardsData?.total ?: emptyList()
+                    1 -> leaderboardsData?.early ?: emptyList()
+                    else -> leaderboardsData?.active ?: emptyList()
                 }
 
                 if (currentList.isEmpty()) {
@@ -300,12 +290,12 @@ fun LeaderboardsBottomSheet(
                             .weight(1f)
                     ) {
                         itemsIndexed(currentList, key = { _, item -> item.userId }) { index, item ->
-                            val rank = index + 1
-                            val displayName = item.nickname ?: item.username ?: "居民"
+                            val rank = item.rank.takeIf { it > 0 } ?: (index + 1)
+                            val displayName = item.nickname ?: item.username.ifBlank { "居民" }
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { onUserClick(item.userId) }
+                                    .clickable { onUserClick(item.userId.toLongOrNull() ?: 0L) }
                                     .padding(horizontal = 16.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -330,7 +320,7 @@ fun LeaderboardsBottomSheet(
                                 Spacer(modifier = Modifier.width(10.dp))
 
                                 UserAvatar(
-                                    avatarUrl = item.avatar,
+                                    avatarUrl = item.avatarUrl,
                                     displayName = displayName,
                                     size = 40.dp
                                 )
@@ -362,10 +352,10 @@ fun LeaderboardsBottomSheet(
                                             )
                                         }
                                     }
-                                    if (!item.label.isNullOrBlank()) {
+                                    if (item.title.isNotBlank()) {
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = item.label,
+                                            text = item.title,
                                             fontSize = 11.sp,
                                             color = extColors.textTertiary
                                         )
@@ -373,10 +363,12 @@ fun LeaderboardsBottomSheet(
                                 }
 
                                 Text(
-                                    text = when (selectedTab) {
-                                        0 -> "${item.score} 天"
-                                        1 -> if (item.score > 0) "${item.score} 次" else ""
-                                        else -> "${item.score} 热度"
+                                    text = item.metricLabel.ifBlank {
+                                        when (selectedTab) {
+                                            0 -> "${item.level} 级"
+                                            1 -> "早签前列"
+                                            else -> "高活跃"
+                                        }
                                     },
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,

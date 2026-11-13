@@ -11,9 +11,14 @@ import retrofit2.http.PUT
 import top.deepcommunity.app.data.model.ChatMessageDto
 import top.deepcommunity.app.data.model.CollectStickerRequest
 import top.deepcommunity.app.data.model.ConversationDto
+import top.deepcommunity.app.data.model.FortuneResultDto
+import top.deepcommunity.app.data.model.FortuneStatusDto
 import top.deepcommunity.app.data.model.GroupApplyRequestDto
 import top.deepcommunity.app.data.model.GroupCheckinStatusDto
 import top.deepcommunity.app.data.model.GroupMemberDto
+import top.deepcommunity.app.data.model.IdiomAnswerRequest
+import top.deepcommunity.app.data.model.IdiomAnswerResponse
+import top.deepcommunity.app.data.model.IdiomChainStateDto
 import top.deepcommunity.app.data.model.GroupRoomDto
 import top.deepcommunity.app.data.model.KickMemberRequest
 import top.deepcommunity.app.data.model.MessageResponse
@@ -153,4 +158,26 @@ interface ChatApi {
         @Path("room_id") roomId: String,
         @Path("request_id") requestId: String
     ): Response<MessageResponse>
+
+    // 群互动活动：每日求签与成语接龙
+    @GET("api/chat/groups/{room_id}/fortune/status")
+    suspend fun getFortuneStatus(@Path("room_id") roomId: String): Response<FortuneStatusDto>
+
+    @POST("api/chat/groups/{room_id}/fortune")
+    suspend fun drawFortune(@Path("room_id") roomId: String): Response<FortuneResultDto>
+
+    @GET("api/chat/groups/{room_id}/idiom-chain/state")
+    suspend fun getIdiomChainState(@Path("room_id") roomId: String): Response<IdiomChainStateDto>
+
+    @POST("api/chat/groups/{room_id}/idiom-chain/start")
+    suspend fun startIdiomChain(@Path("room_id") roomId: String): Response<IdiomChainStateDto>
+
+    @POST("api/chat/groups/{room_id}/idiom-chain/answer")
+    suspend fun answerIdiomChain(
+        @Path("room_id") roomId: String,
+        @Body req: IdiomAnswerRequest
+    ): Response<IdiomAnswerResponse>
+
+    @POST("api/chat/groups/{room_id}/idiom-chain/end")
+    suspend fun endIdiomChain(@Path("room_id") roomId: String): Response<MessageResponse>
 }

@@ -20,6 +20,7 @@ object ChatContentParser {
     )
 
     private val DICE_POINTS_REGEX = Pattern.compile(""""points"\s*:\s*(\d+)""")
+    private val JSON_TEXT_REGEX = Pattern.compile("\"text\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\"")
 
     /**
      * 格式化完整的消息显示，分离文本与图片列表
@@ -49,6 +50,24 @@ object ChatContentParser {
                 dicePoints = null,
                 isCheckin = true
             )
+        }
+
+        // 成语接龙 / 每日求签 / 投票或群事件机器人的结构化 JSON 消息
+        if (msgType in listOf("chain", "fortune", "poll") || (trimmed.startsWith("{") && trimmed.contains("\"text\""))) {
+            val textMatcher = JSON_TEXT_REGEX.matcher(trimmed)
+            if (textMatcher.find()) {
+                val extracted = textMatcher.group(1)?.replace("\\\"", "\"")?.replace("\\n", "\n") ?: ""
+                if (extracted.isNotBlank()) {
+                    return ParsedChatContent(
+                        pureText = extracted,
+                        imageUrls = emptyList(),
+                        isPureImage = false,
+                        isDice = false,
+                        dicePoints = null,
+                        isCheckin = false
+                    )
+                }
+            }
         }
 
         val matcher = IMAGE_REGEX.matcher(trimmed)
@@ -83,6 +102,14 @@ object ChatContentParser {
         if (target.isBlank()) return ""
 
         val trimmed = target.trim()
+        if (trimmed.startsWith("{") && trimmed.contains("\"text\"")) {
+            val m = JSON_TEXT_REGEX.matcher(trimmed)
+            if (m.find()) {
+                val txt = m.group(1)?.replace("\\\"", "\"")?.replace("\\n", " ") ?: ""
+                if (txt.isNotBlank()) return txt.take(30)
+            }
+        }
+
         if (trimmed.contains("points") && trimmed.contains("{")) {
             val m = DICE_POINTS_REGEX.matcher(trimmed)
             if (m.find()) {
