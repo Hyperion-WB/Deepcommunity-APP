@@ -66,6 +66,10 @@ sealed interface ChatEvent {
     data class ShowToast(val message: String) : ChatEvent
     data object ScrollToBottom : ChatEvent
     data class ScrollToIndex(val index: Int) : ChatEvent
+    data object InitialScrollToBottom : ChatEvent
+    data object SelfSentScrollToBottom : ChatEvent
+    data object IncomingNewMessage : ChatEvent
+    data class HistoryLoaded(val addedCount: Int) : ChatEvent
 }
 
 @HiltViewModel
@@ -386,11 +390,10 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
-
     private fun loadHistory() {
         viewModelScope.launch {
             checkUnreadForConversation()
-            chatRepository.getMessages(convId).collect { result ->
+            chatRepository.getMessages(convId, page = 1, size = 50).collect { result ->
                 when (result) {
                     is Resource.Loading -> _uiState.update { it.copy(isLoading = true) }
                     is Resource.Success -> {
@@ -399,10 +402,12 @@ class ChatViewModel @Inject constructor(
                                 messages = result.data,
                                 isGroupChat = false,
                                 chatTitle = "私信会话",
-                                isLoading = false
+                                isLoading = false,
+                                currentPage = 1,
+                                hasMoreHistory = result.data.size >= 50
                             )
                         }
-                        _eventFlow.emit(ChatEvent.ScrollToBottom)
+                        _eventFlow.emit(ChatEvent.InitialScrollToBottom)
                         chatRepository.markConversationRead(convId).collect {}
                     }
                     is Resource.Error -> {
@@ -416,7 +421,7 @@ class ChatViewModel @Inject constructor(
     private fun loadGroupHistory() {
         viewModelScope.launch {
             checkUnreadForGroup()
-            chatRepository.getGroupMessages(convId).collect { result ->
+            chatRepository.getGroupMessages(convId, page = 1, size = 50).collect { result ->
                 when (result) {
                     is Resource.Loading -> {}
                     is Resource.Success -> {
@@ -425,11 +430,13 @@ class ChatViewModel @Inject constructor(
                                 messages = result.data,
                                 isGroupChat = true,
                                 chatTitle = "社区群聊",
-                                isLoading = false
+                                isLoading = false,
+                                currentPage = 1,
+                                hasMoreHistory = result.data.size >= 50
                             )
                         }
                         loadGroupCheckinStatus()
-                        _eventFlow.emit(ChatEvent.ScrollToBottom)
+                        _eventFlow.emit(ChatEvent.InitialScrollToBottom)
                         chatRepository.markGroupRead(convId).collect {}
                     }
                     is Resource.Error -> {
@@ -466,8 +473,12 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    // 往上滑动翻页加载更早的历史聊天记录 (对齐 Web 端)
+    // 往上滑动翻页加载更早的历史聊天记录 (对齐 Web 端，并校准滚动偏移量)
     fun loadOlderHistory() {
+        loadMoreHistory()
+    }
+
+    fun loadMoreHistory() {
         val state = _uiState.value
         if (state.isLoadingOlder || !state.hasMoreHistory) return
 
@@ -475,24 +486,30 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingOlder = true) }
             val flow = if (state.isGroupChat) {
-                chatRepository.getGroupMessages(convId, page = nextPage)
+                chatRepository.getGroupMessages(convId, page = nextPage, size = 50)
             } else {
-                chatRepository.getMessages(convId, page = nextPage)
+                chatRepository.getMessages(convId, page = nextPage, size = 50)
             }
             flow.collect { result ->
                 when (result) {
                     is Resource.Success -> {
                         val older = result.data
-                        if (older.isEmpty()) {
-                            _uiState.update { it.copy(hasMoreHistory = false, isLoadingOlder = false) }
-                        } else {
-                            val currentIds = state.messages.map { it.id }.toSet()
-                            val newOlder = older.filter { it.id !in currentIds }
+                        val currentList = _uiState.value.messages
+                        val newOlder = older.filter { old -> currentList.none { it.id == old.id } }
+                        if (newOlder.isNotEmpty()) {
                             _uiState.update { current ->
                                 current.copy(
                                     messages = newOlder + current.messages,
                                     currentPage = nextPage,
                                     hasMoreHistory = older.size >= 50,
+                                    isLoadingOlder = false
+                                )
+                            }
+                            _eventFlow.emit(ChatEvent.HistoryLoaded(newOlder.size))
+                        } else {
+                            _uiState.update {
+                                it.copy(
+                                    hasMoreHistory = false,
                                     isLoadingOlder = false
                                 )
                             }
@@ -544,11 +561,38 @@ class ChatViewModel @Inject constructor(
     fun dismissUnreadBanner() {
         _uiState.update { it.copy(unreadAtEntry = 0) }
     }
-
     private fun listenRealtime() {
         viewModelScope.launch {
             chatRepository.incomingRealtime.collect {
-                loadHistory()
+                handleRealtimeUpdate()
+            }
+        }
+    }
+
+    // 接收到实时消息时，只增量抓取最新消息，绝不重置或强制拉回用户浏览位置
+    private fun handleRealtimeUpdate() {
+        viewModelScope.launch {
+            val flow = if (_uiState.value.isGroupChat) {
+                chatRepository.getGroupMessages(convId, page = 1, size = 20)
+            } else {
+                chatRepository.getMessages(convId, page = 1, size = 20)
+            }
+            flow.collect { result ->
+                if (result is Resource.Success) {
+                    val currentList = _uiState.value.messages
+                    val newIncoming = result.data.filter { latest ->
+                        currentList.none { it.id == latest.id }
+                    }
+                    if (newIncoming.isNotEmpty()) {
+                        _uiState.update { it.copy(messages = currentList + newIncoming) }
+                        val hasOthers = newIncoming.any { it.senderId != _uiState.value.currentUserId }
+                        if (hasOthers) {
+                            _eventFlow.emit(ChatEvent.IncomingNewMessage)
+                        } else {
+                            _eventFlow.emit(ChatEvent.SelfSentScrollToBottom)
+                        }
+                    }
+                }
             }
         }
     }
@@ -580,13 +624,17 @@ class ChatViewModel @Inject constructor(
                 when (result) {
                     is Resource.Loading -> _uiState.update { it.copy(isSending = true) }
                     is Resource.Success -> {
+                        val sentMsg = result.data
                         _uiState.update { state ->
+                            val updated = if (state.messages.none { it.id == sentMsg.id }) {
+                                state.messages + sentMsg
+                            } else state.messages
                             state.copy(
-                                messages = state.messages + result.data,
+                                messages = updated,
                                 isSending = false
                             )
                         }
-                        _eventFlow.emit(ChatEvent.ScrollToBottom)
+                        _eventFlow.emit(ChatEvent.SelfSentScrollToBottom)
                     }
                     is Resource.Error -> {
                         _uiState.update { it.copy(isSending = false) }

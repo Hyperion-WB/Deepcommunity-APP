@@ -49,6 +49,7 @@ import top.deepcommunity.app.ui.profile.PrivacyDndBottomSheet
 import top.deepcommunity.app.ui.profile.UserProfileBottomSheet
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -61,6 +62,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import top.deepcommunity.app.data.model.BlockedUserDto
 import androidx.compose.runtime.Composable
@@ -103,6 +105,7 @@ fun ProfileScreen(
     var showPrivacyDndSheet by remember { mutableStateOf(false) }
     var selectedOtherUserId by remember { mutableStateOf<String?>(null) }
     var selectedOtherUsername by remember { mutableStateOf<String?>(null) }
+    var showLogoutConfirmDialog by remember { mutableStateOf(false) }
 
     // 左右滑动手势联动选中的 Tab
     LaunchedEffect(pagerState.currentPage) {
@@ -584,7 +587,7 @@ fun ProfileScreen(
                 }
             }
 
-            // 退出登录按钮
+            // 退出登录按钮（增加极客二次防误触确认）
             item {
                 Spacer(modifier = Modifier.height(6.dp))
                 Box(
@@ -592,7 +595,7 @@ fun ProfileScreen(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
                         .background(DeepTheme.extended.surfaceElevated)
-                        .clickable(onClick = viewModel::logout)
+                        .clickable { showLogoutConfirmDialog = true }
                         .padding(vertical = 14.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -604,6 +607,30 @@ fun ProfileScreen(
                     )
                 }
             }
+        }
+
+        // 退出登录防误触确认对话框
+        if (showLogoutConfirmDialog) {
+            AlertDialog(
+                onDismissRequest = { showLogoutConfirmDialog = false },
+                title = { Text("退出登录", fontWeight = FontWeight.Bold) },
+                text = { Text("确定要退出当前账号吗？退出后需重新输入凭证登录。", fontSize = 14.sp) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showLogoutConfirmDialog = false
+                            viewModel.logout()
+                        }
+                    ) {
+                        Text("确定退出", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showLogoutConfirmDialog = false }) {
+                        Text("取消", color = DeepTheme.extended.textTertiary)
+                    }
+                }
+            )
         }
 
         // 黑名单抽屉

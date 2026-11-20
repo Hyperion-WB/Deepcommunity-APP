@@ -22,6 +22,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.material.icons.outlined.ArrowDownward
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.animation.animateColorAsState
@@ -71,6 +73,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material.icons.outlined.AutoAwesome
@@ -102,6 +105,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -109,6 +113,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -178,6 +183,25 @@ fun ChatScreen(
         }
     }
 
+    var unreadNewCount by remember { mutableIntStateOf(0) }
+
+    // 监听当前用户是否处于列表最底部附近（最后一条已在可见范围内）
+    val isNearBottom by remember {
+        derivedStateOf {
+            val total = listState.layoutInfo.totalItemsCount
+            if (total == 0) return@derivedStateOf true
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            lastVisible >= total - 2
+        }
+    }
+
+    // 当用户手动滑回底部时，自动清除未读新消息提示计数
+    LaunchedEffect(isNearBottom) {
+        if (isNearBottom) {
+            unreadNewCount = 0
+        }
+    }
+
     LaunchedEffect(key1 = true) {
         viewModel.eventFlow.collect { event ->
             when (event) {
@@ -192,14 +216,35 @@ fun ChatScreen(
                         listState.animateScrollToItem(event.index)
                     }
                 }
+                is ChatEvent.InitialScrollToBottom -> {
+                    if (uiState.messages.isNotEmpty() && uiState.unreadAtEntry == 0) {
+                        listState.scrollToItem(uiState.messages.size - 1)
+                    }
+                }
+                is ChatEvent.SelfSentScrollToBottom -> {
+                    if (uiState.messages.isNotEmpty()) {
+                        listState.animateScrollToItem(uiState.messages.size - 1)
+                        unreadNewCount = 0
+                    }
+                }
+                is ChatEvent.IncomingNewMessage -> {
+                    if (isNearBottom) {
+                        // 用户当前本来就在底部，自然平滑下滚
+                        if (uiState.messages.isNotEmpty()) {
+                            listState.animateScrollToItem(uiState.messages.size - 1)
+                        }
+                    } else {
+                        // 用户正在往上翻看历史消息，绝不强制滚动打扰阅读，仅累加新消息提示
+                        unreadNewCount += 1
+                    }
+                }
+                is ChatEvent.HistoryLoaded -> {
+                    // 加载了更早历史消息后，校准当前位置，保持用户屏幕视野完全不动
+                    val newIndex = listState.firstVisibleItemIndex + event.addedCount
+                    val newOffset = listState.firstVisibleItemScrollOffset
+                    listState.scrollToItem(newIndex, newOffset)
+                }
             }
-        }
-    }
-
-    // 默认打开时/加载完成时立即精准定位到最新消息底部（若正在定位未读则不抢焦）
-    LaunchedEffect(uiState.isLoading) {
-        if (!uiState.isLoading && uiState.messages.isNotEmpty() && uiState.unreadAtEntry == 0) {
-            listState.scrollToItem(uiState.messages.size - 1)
         }
     }
 
@@ -214,7 +259,6 @@ fun ChatScreen(
             viewModel.loadOlderHistory()
         }
     }
-
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background,
@@ -642,7 +686,7 @@ fun ChatScreen(
                 }
             }
 
-            // 右下角回到最新悬浮按钮
+            // 右下角悬浮：如果有新消息，显示新消息药丸提示；否则若用户往上翻阅较深，显示“回到最新”悬浮条
             val showScrollToBottom by remember {
                 derivedStateOf {
                     val total = listState.layoutInfo.totalItemsCount
@@ -652,42 +696,78 @@ fun ChatScreen(
             }
 
             AnimatedVisibility(
-                visible = showScrollToBottom,
-                enter = fadeIn() + scaleIn(),
-                exit = fadeOut() + scaleOut(),
+                visible = unreadNewCount > 0 || showScrollToBottom,
+                enter = fadeIn() + slideInVertically { it / 2 },
+                exit = fadeOut() + slideOutVertically { it / 2 },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 16.dp)
+                    .padding(end = 16.dp, bottom = 12.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .shadow(6.dp, RoundedCornerShape(18.dp), spotColor = Color.Black.copy(alpha = 0.2f))
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(DeepTheme.extended.surfaceElevated)
-                        .border(0.8.dp, DeepTheme.extended.border, RoundedCornerShape(18.dp))
-                        .clickable {
-                            scope.launch {
-                                if (uiState.messages.isNotEmpty()) {
-                                    listState.animateScrollToItem(uiState.messages.size - 1)
+                if (unreadNewCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .shadow(8.dp, RoundedCornerShape(20.dp), spotColor = Color.Black.copy(alpha = 0.25f))
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(MaterialTheme.colorScheme.primary)
+                            .clickable {
+                                scope.launch {
+                                    if (uiState.messages.isNotEmpty()) {
+                                        listState.animateScrollToItem(uiState.messages.size - 1)
+                                    }
+                                    unreadNewCount = 0
                                 }
                             }
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = "滚动至最新",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = if (unreadNewCount == 1) "新消息" else "$unreadNewCount 条新消息",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
                         }
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.ArrowDownward,
-                        contentDescription = "回到最新",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "回到最新",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .shadow(6.dp, RoundedCornerShape(18.dp), spotColor = Color.Black.copy(alpha = 0.2f))
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(DeepTheme.extended.surfaceElevated)
+                            .border(0.8.dp, DeepTheme.extended.border, RoundedCornerShape(18.dp))
+                            .clickable {
+                                scope.launch {
+                                    if (uiState.messages.isNotEmpty()) {
+                                        listState.animateScrollToItem(uiState.messages.size - 1)
+                                    }
+                                }
+                            }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.ArrowDownward,
+                            contentDescription = "回到最新",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "回到最新",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
             }
         }

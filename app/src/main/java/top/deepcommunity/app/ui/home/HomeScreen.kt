@@ -62,6 +62,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -503,105 +504,111 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // 帖子流展示区
-        if (uiState.isLoading && uiState.posts.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(36.dp)
-                )
-            }
-        } else {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 100.dp, start = 16.dp, end = 16.dp, top = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                if (uiState.posts.isEmpty()) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 60.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Article,
-                                    contentDescription = null,
-                                    tint = DeepTheme.extended.textTertiary,
-                                    modifier = Modifier.size(44.dp)
+        // 帖子流展示区（集成现代 Material 3 下拉手势刷新）
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = viewModel::refresh,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            if (uiState.isLoading && uiState.posts.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 100.dp, start = 16.dp, end = 16.dp, top = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    if (uiState.posts.isEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 60.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Article,
+                                        contentDescription = null,
+                                        tint = DeepTheme.extended.textTertiary,
+                                        modifier = Modifier.size(44.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text(
+                                        text = uiState.errorMessage ?: "暂无相关帖子",
+                                        fontSize = 13.sp,
+                                        color = DeepTheme.extended.textTertiary
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        text = "刷新重试",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                                            .border(0.8.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
+                                            .clickable { viewModel.loadPosts(isRefresh = true) }
+                                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        items(uiState.posts, key = { it.id }) { post ->
+                            PostCard(
+                                post = post,
+                                onClick = { onPostClick(post.id) },
+                                onLikeClick = { viewModel.toggleLike(post.id) },
+                                onImageClick = { previewImageUrl = it },
+                                onAuthorClick = { uName, uId ->
+                                    selectedAuthorUsername = uName
+                                    selectedAuthorId = uId
+                                }
+                            )
+                        }
+                    }
+
+                    if (uiState.isLoadingMore) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 14.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(24.dp),
+                                    color = MaterialTheme.colorScheme.primary
                                 )
-                                Spacer(modifier = Modifier.height(10.dp))
+                            }
+                        }
+                    } else if (uiState.isEndReached && uiState.posts.isNotEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 20.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Text(
-                                    text = uiState.errorMessage ?: "暂无相关帖子",
-                                    fontSize = 13.sp,
+                                    text = "—— 已加载全部动态 ——",
+                                    fontSize = 11.sp,
                                     color = DeepTheme.extended.textTertiary
                                 )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    text = "刷新重试",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
-                                        .border(0.8.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
-                                        .clickable { viewModel.loadPosts(isRefresh = true) }
-                                        .padding(horizontal = 14.dp, vertical = 6.dp)
-                                )
                             }
-                        }
-                    }
-                } else {
-                    items(uiState.posts, key = { it.id }) { post ->
-                        PostCard(
-                            post = post,
-                            onClick = { onPostClick(post.id) },
-                            onLikeClick = { viewModel.toggleLike(post.id) },
-                            onImageClick = { previewImageUrl = it },
-                            onAuthorClick = { uName, uId ->
-                                selectedAuthorUsername = uName
-                                selectedAuthorId = uId
-                            }
-                        )
-                    }
-                }
-
-                if (uiState.isLoadingMore) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 14.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(
-                                strokeWidth = 2.dp,
-                                modifier = Modifier.size(24.dp),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                } else if (uiState.isEndReached && uiState.posts.isNotEmpty()) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 20.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "—— 已加载全部动态 ——",
-                                fontSize = 11.sp,
-                                color = DeepTheme.extended.textTertiary
-                            )
                         }
                     }
                 }

@@ -162,6 +162,11 @@ class HomeViewModel @Inject constructor(
         searchHistoryManager.clearHistory()
     }
 
+    fun refresh() {
+        loadPosts(isRefresh = true)
+        loadCategories()
+    }
+
     fun loadPosts(isRefresh: Boolean = false) {
         if (isRefresh) {
             currentPage = 1

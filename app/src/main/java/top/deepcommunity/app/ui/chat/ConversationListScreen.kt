@@ -32,8 +32,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -59,6 +61,7 @@ import top.deepcommunity.app.data.model.ConversationDto
 import top.deepcommunity.app.data.model.GroupRoomDto
 import top.deepcommunity.app.ui.notification.NotificationScreen
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConversationListScreen(
     onConversationClick: (String) -> Unit,
@@ -112,22 +115,28 @@ fun ConversationListScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // 支持手势直接左右滑动切换的水平翻页器
-        HorizontalPager(
-            state = pagerState,
+        // 集成现代下拉手势刷新，双向支持手势滑动切换私聊/群聊
+        PullToRefreshBox(
+            isRefreshing = uiState.isLoading,
+            onRefresh = viewModel::refreshAll,
             modifier = Modifier.fillMaxSize()
-        ) { page ->
-            when (page) {
-                0 -> PrivateChatList(
-                    conversations = uiState.conversations,
-                    isLoading = uiState.isLoading,
-                    onConversationClick = onConversationClick
-                )
-                1 -> GroupChatList(
-                    groups = uiState.groups,
-                    isLoading = uiState.isLoading,
-                    onGroupClick = onConversationClick
-                )
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                when (page) {
+                    0 -> PrivateChatList(
+                        conversations = uiState.conversations,
+                        isLoading = uiState.isLoading,
+                        onConversationClick = onConversationClick
+                    )
+                    1 -> GroupChatList(
+                        groups = uiState.groups,
+                        isLoading = uiState.isLoading,
+                        onGroupClick = onConversationClick
+                    )
+                }
             }
         }
     }
@@ -341,7 +350,10 @@ private fun ConversationItemCard(
             ) {
                 val preview = when {
                     !conversation.lastMessagePreview.isNullOrBlank() -> conversation.lastMessagePreview!!
-                    lastMsg?.content?.startsWith("/uploads/") == true -> "[图片]"
+                    lastMsg?.msgType == "image" -> "[图片]"
+                    lastMsg?.msgType == "sticker" -> "[表情]"
+                    lastMsg?.content?.contains("/uploads/") == true -> "[图片]"
+                    lastMsg?.content?.let { c -> c.endsWith(".png", true) || c.endsWith(".jpg", true) || c.endsWith(".jpeg", true) || c.endsWith(".webp", true) || c.endsWith(".gif", true) } == true -> "[图片]"
                     lastMsg?.content != null -> lastMsg.content
                     else -> "暂无消息"
                 }
