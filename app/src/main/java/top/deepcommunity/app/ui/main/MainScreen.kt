@@ -162,15 +162,11 @@ fun MainScreen(
                         onNotificationClick = { notif ->
                             val targetId = notif.targetId
                             if (!targetId.isNullOrBlank()) {
-                                when (notif.actionType) {
-                                    "group_apply", "group_apply_approved", "group_apply_rejected",
-                                    "group_invite", "group_owner_transferred", "chat_message",
-                                    "group_room" -> {
-                                        onNavigateToChatDetail(targetId)
-                                    }
-                                    else -> {
-                                        onNavigateToPostDetail(targetId)
-                                    }
+                                val action = notif.actionType.lowercase()
+                                if (action.contains("group") || action.contains("chat") || action.contains("room") || action.contains("apply") || action.contains("invite")) {
+                                    onNavigateToChatDetail(targetId)
+                                } else {
+                                    onNavigateToPostDetail(targetId)
                                 }
                             }
                         }

@@ -85,7 +85,9 @@ import androidx.compose.material.icons.outlined.Mood
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.ui.graphics.vector.ImageVector
 import top.deepcommunity.app.ui.chat.component.DiceCube
-import androidx.compose.material3.AlertDialog
+import top.deepcommunity.app.core.designsystem.component.DeepConfirmDialog
+import top.deepcommunity.app.core.designsystem.component.DeepActionDialog
+import top.deepcommunity.app.core.designsystem.component.DialogActionItem
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -830,26 +832,18 @@ fun ChatScreen(
             }
         }
 
-        // 私聊拉黑确认对话框
+        // 私聊拉黑确认对话框 (统一极简液态质感)
         if (showBlockConfirmDialog) {
-            AlertDialog(
+            DeepConfirmDialog(
                 onDismissRequest = { showBlockConfirmDialog = false },
-                title = { Text("加入黑名单") },
-                text = { Text("确定要将用户 @${uiState.chatTitle} 加入黑名单吗？加入后将不再接收对方发送的任何私聊消息。") },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showBlockConfirmDialog = false
-                            viewModel.blockUser(uiState.chatTitle) { onBackClick() }
-                        }
-                    ) {
-                        Text("确定拉黑", color = MaterialTheme.colorScheme.error)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showBlockConfirmDialog = false }) {
-                        Text("取消")
-                    }
+                title = "加入黑名单",
+                message = "确定要将用户 @${uiState.chatTitle} 加入黑名单吗？加入后将不再接收对方发送的任何私聊消息。",
+                confirmText = "确定拉黑",
+                dismissText = "取消",
+                isDanger = true,
+                onConfirm = {
+                    showBlockConfirmDialog = false
+                    viewModel.blockUser(uiState.chatTitle) { onBackClick() }
                 }
             )
         }
@@ -977,24 +971,16 @@ private fun EnhancedStickerDrawer(
 
     if (stickerToDelete != null) {
         val target = stickerToDelete!!
-        AlertDialog(
+        DeepConfirmDialog(
             onDismissRequest = { stickerToDelete = null },
-            title = { Text("移除表情包", fontSize = 15.sp) },
-            text = { Text("确定要将该表情包从「我的表情」中移除吗？", fontSize = 13.sp) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        stickerToDelete = null
-                        onStickerDelete?.invoke(target.id)
-                    }
-                ) {
-                    Text("确定移除", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { stickerToDelete = null }) {
-                    Text("取消")
-                }
+            title = "移除表情包",
+            message = "确定要将该表情包从「我的表情」中移除吗？",
+            confirmText = "确定移除",
+            dismissText = "取消",
+            isDanger = true,
+            onConfirm = {
+                stickerToDelete = null
+                onStickerDelete?.invoke(target.id)
             }
         )
     }
@@ -1483,7 +1469,7 @@ private fun ChatMessageBubble(
                         // 若有文本部分：
                         if (parsed.pureText.isNotBlank()) {
                             val content = parsed.pureText
-                            val urlPattern = remember { Pattern.compile("https?://[\\w-]+(\\.[\\w-]+)+(/[\\w-./?%&=#@:;+~]*)?") }
+                            val urlPattern = remember { Pattern.compile("(https?://[a-zA-Z0-9][-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[a-zA-Z0-9+&@#/%=~_|]|www\\.[a-zA-Z0-9][-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[a-zA-Z0-9+&@#/%=~_|])") }
                             val hasUrl = remember(content) { urlPattern.matcher(content).find() }
                             val linkColor = if (isMe) Color.White else MaterialTheme.colorScheme.primary
 
@@ -1527,7 +1513,11 @@ private fun ChatMessageBubble(
                                         annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
                                             .firstOrNull()?.let { annotation ->
                                                 try {
-                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(annotation.item)).apply {
+                                                    var targetUrl = annotation.item
+                                                    if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
+                                                        targetUrl = "https://$targetUrl"
+                                                    }
+                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)).apply {
                                                         flags = Intent.FLAG_ACTIVITY_NEW_TASK
                                                     }
                                                     context.startActivity(intent)
@@ -1949,85 +1939,82 @@ private fun GroupInfoSheetContent(
         Spacer(modifier = Modifier.height(20.dp))
     }
 
-    // 成员管理弹窗
+    // 成员管理操作面板 (统一极简液态质感)
     selectedMemberForAction?.let { member ->
         val isOwner = myRole == "owner"
-        AlertDialog(
-            onDismissRequest = { selectedMemberForAction = null },
-            title = {
-                val atName = member.username.takeIf { it.isNotBlank() } ?: member.displayName
-                Text("成员管理: @$atName")
-            },
-            text = { Text("角色: ${if (member.role == "owner") "群主" else if (member.role == "admin") "管理员" else "普通成员"}") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val targetId = member.userId
-                        selectedMemberForAction = null
-                        onKickMember(targetId)
-                    }
-                ) {
-                    Text("移出群聊", color = MaterialTheme.colorScheme.error)
+        val atName = member.username.takeIf { it.isNotBlank() } ?: member.displayName
+        val roleDesc = if (member.role == "owner") "群主" else if (member.role == "admin") "管理员" else "普通成员"
+
+        val actionList = remember(member, isOwner) {
+            mutableListOf<DialogActionItem>().apply {
+                // @Ta
+                add(
+                    DialogActionItem(
+                        title = "@$atName",
+                        subtitle = "在群聊中提及 Ta",
+                        onClick = { onMemberClick(member) }
+                    )
+                )
+
+                // 禁言操作
+                if (member.role != "owner") {
+                    add(
+                        DialogActionItem(
+                            title = "禁言 1 小时",
+                            subtitle = "限制该成员在当前群内发言 60 分钟",
+                            onClick = { onMuteMember(member.userId, 60) }
+                        )
+                    )
                 }
-            },
-            dismissButton = {
-                Row {
-                    if (isOwner && member.role != "owner") {
-                        val nextRole = if (member.role == "admin") "member" else "admin"
-                        TextButton(
+
+                // 群主授权操作
+                if (isOwner && member.role != "owner") {
+                    val isCurrentlyAdmin = member.role == "admin"
+                    add(
+                        DialogActionItem(
+                            title = if (isCurrentlyAdmin) "撤销管理员" else "设为管理员",
+                            subtitle = if (isCurrentlyAdmin) "降为普通成员权限" else "赋予群成员管理与禁言权限",
                             onClick = {
-                                val targetId = member.userId
-                                selectedMemberForAction = null
-                                onUpdateRole(targetId, nextRole)
+                                onUpdateRole(member.userId, if (isCurrentlyAdmin) "member" else "admin")
                             }
-                        ) {
-                            Text(if (member.role == "admin") "撤销管理" else "设为管理")
-                        }
-                    }
-                    if (member.role != "owner") {
-                        TextButton(
-                            onClick = {
-                                val targetId = member.userId
-                                selectedMemberForAction = null
-                                onMuteMember(targetId, 60)
-                            }
-                        ) {
-                            Text("禁言1h")
-                        }
-                    }
-                    TextButton(
-                        onClick = {
-                            selectedMemberForAction = null
-                            onMemberClick(member)
-                        }
-                    ) {
-                        Text("@Ta")
-                    }
+                        )
+                    )
+                }
+
+                // 移出群聊
+                if (member.role != "owner") {
+                    add(
+                        DialogActionItem(
+                            title = "移出群聊",
+                            subtitle = "将该成员踢出当前群组",
+                            isDanger = true,
+                            onClick = { onKickMember(member.userId) }
+                        )
+                    )
                 }
             }
+        }
+
+        DeepActionDialog(
+            onDismissRequest = { selectedMemberForAction = null },
+            title = "成员管理",
+            subtitle = "@$atName · $roleDesc",
+            actions = actionList
         )
     }
 
-    // 退出群聊确认
+    // 退出群聊确认 (统一极简液态质感)
     if (showLeaveConfirm) {
-        AlertDialog(
+        DeepConfirmDialog(
             onDismissRequest = { showLeaveConfirm = false },
-            title = { Text("退出群聊") },
-            text = { Text("确定要退出群聊「$roomTitle」吗？退出后将无法接收该群的后续消息。") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showLeaveConfirm = false
-                        onLeaveGroup()
-                    }
-                ) {
-                    Text("确定退出", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showLeaveConfirm = false }) {
-                    Text("取消")
-                }
+            title = "退出群聊",
+            message = "确定要退出群聊「$roomTitle」吗？退出后将无法接收该群的后续消息。",
+            confirmText = "确定退出",
+            dismissText = "取消",
+            isDanger = true,
+            onConfirm = {
+                showLeaveConfirm = false
+                onLeaveGroup()
             }
         )
     }

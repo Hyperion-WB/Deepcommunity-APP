@@ -16,13 +16,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import top.deepcommunity.app.core.designsystem.component.GlassBox
+import top.deepcommunity.app.core.designsystem.theme.DeepTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -76,23 +78,33 @@ fun ReportDialog(
         else -> "举报内容"
     }
 
-    BasicAlertDialog(
+    Dialog(
         onDismissRequest = { if (!isSubmitting) onDismissRequest() },
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.background)
-            .border(1.dp, extColors.glassBorder, RoundedCornerShape(16.dp))
-            .padding(20.dp)
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = typeLabel,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            GlassBox(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                backgroundColor = DeepTheme.extended.surfaceElevated,
+                elevation = 20.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(22.dp)
+                ) {
+                    Text(
+                        text = typeLabel,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
 
             if (!targetTitle.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(4.dp))
@@ -217,4 +229,6 @@ fun ReportDialog(
             }
         }
     }
+}
+}
 }

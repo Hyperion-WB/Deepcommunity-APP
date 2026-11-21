@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -244,34 +243,11 @@ fun MarkdownContent(
             )
         }
 
-        // 大图全屏查看弹层
-        if (previewImageUrl != null) {
-            BasicAlertDialog(onDismissRequest = { previewImageUrl = null }) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clickable { previewImageUrl = null },
-                    contentAlignment = Alignment.Center
-                ) {
-                    SubcomposeAsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(previewImageUrl)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = "查看大图",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp)),
-                        contentScale = ContentScale.Fit,
-                        loading = {
-                            Box(modifier = Modifier.size(60.dp), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator(strokeWidth = 2.dp)
-                            }
-                        }
-                    )
-                }
-            }
-        }
+        // 大图全屏查看弹层（沉浸式双指缩放/双击放大/一键保存相册）
+        ImageViewerDialog(
+            imageUrl = previewImageUrl,
+            onDismissRequest = { previewImageUrl = null }
+        )
     }
 }
 

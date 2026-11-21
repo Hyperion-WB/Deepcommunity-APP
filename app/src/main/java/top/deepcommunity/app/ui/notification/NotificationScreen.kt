@@ -30,7 +30,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material3.AlertDialog
+import top.deepcommunity.app.core.designsystem.component.DeepConfirmDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -80,50 +80,34 @@ fun NotificationScreen(
         viewModel.loadNotifications(isRefresh = true)
     }
 
-    // 全部已读确认弹窗
+    // 全部已读确认弹窗 (统一极简液态质感)
     if (showMarkAllReadDialog) {
-        AlertDialog(
+        DeepConfirmDialog(
             onDismissRequest = { showMarkAllReadDialog = false },
-            title = { Text("全部已读", fontWeight = FontWeight.Bold) },
-            text = { Text("是否确定将所有未读消息标记为已读？", fontSize = 14.sp) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showMarkAllReadDialog = false
-                        viewModel.markAllAsRead()
-                    }
-                ) {
-                    Text("确定全部已读", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showMarkAllReadDialog = false }) {
-                    Text("取消")
-                }
+            title = "全部标记已读",
+            message = "是否确定将所有未读消息标记为已读？",
+            confirmText = "全部已读",
+            dismissText = "取消",
+            isDanger = false,
+            onConfirm = {
+                showMarkAllReadDialog = false
+                viewModel.markAllAsRead()
             }
         )
     }
 
-    // 全部清空确认弹窗
+    // 全部清空确认弹窗 (统一极简液态质感)
     if (showClearAllDialog) {
-        AlertDialog(
+        DeepConfirmDialog(
             onDismissRequest = { showClearAllDialog = false },
-            title = { Text("清空提醒", fontWeight = FontWeight.Bold) },
-            text = { Text("是否确定清空全部消息提醒？此操作不可恢复。", fontSize = 14.sp) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showClearAllDialog = false
-                        viewModel.clearAllNotifications()
-                    }
-                ) {
-                    Text("确定清空", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showClearAllDialog = false }) {
-                    Text("取消")
-                }
+            title = "清空全部提醒",
+            message = "是否确定清空全部消息提醒？此操作不可恢复。",
+            confirmText = "确定清空",
+            dismissText = "取消",
+            isDanger = true,
+            onConfirm = {
+                showClearAllDialog = false
+                viewModel.clearAllNotifications()
             }
         )
     }

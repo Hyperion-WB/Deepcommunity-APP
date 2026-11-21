@@ -49,8 +49,10 @@ import top.deepcommunity.app.ui.profile.PrivacyDndBottomSheet
 import top.deepcommunity.app.ui.profile.UserProfileBottomSheet
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import top.deepcommunity.app.core.designsystem.component.DeepConfirmDialog
+import top.deepcommunity.app.core.designsystem.component.GlassBox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -609,26 +611,18 @@ fun ProfileScreen(
             }
         }
 
-        // 退出登录防误触确认对话框
+        // 退出登录防误触确认对话框 (统一极简液态质感)
         if (showLogoutConfirmDialog) {
-            AlertDialog(
+            DeepConfirmDialog(
                 onDismissRequest = { showLogoutConfirmDialog = false },
-                title = { Text("退出登录", fontWeight = FontWeight.Bold) },
-                text = { Text("确定要退出当前账号吗？退出后需重新输入凭证登录。", fontSize = 14.sp) },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showLogoutConfirmDialog = false
-                            viewModel.logout()
-                        }
-                    ) {
-                        Text("确定退出", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showLogoutConfirmDialog = false }) {
-                        Text("取消", color = DeepTheme.extended.textTertiary)
-                    }
+                title = "退出登录",
+                message = "确定要退出当前账号吗？退出后需重新输入凭证登录。",
+                confirmText = "确定退出",
+                dismissText = "取消",
+                isDanger = true,
+                onConfirm = {
+                    showLogoutConfirmDialog = false
+                    viewModel.logout()
                 }
             )
         }
@@ -710,105 +704,124 @@ private fun EditProfileDialog(
     var nickname by remember { mutableStateOf(currentNickname) }
     var bio by remember { mutableStateOf(currentBio) }
 
-    BasicAlertDialog(onDismissRequest = onDismiss) {
-        Column(
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, DeepTheme.extended.border, RoundedCornerShape(20.dp))
-                .padding(20.dp)
+                .fillMaxWidth()
+                .padding(horizontal = 28.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "修改个人资料",
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "昵称",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = DeepTheme.extended.textSecondary
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            OutlinedTextField(
-                value = nickname,
-                onValueChange = { nickname = it },
+            GlassBox(
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = DeepTheme.extended.border
-                )
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = "个人简介",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = DeepTheme.extended.textSecondary
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            OutlinedTextField(
-                value = bio,
-                onValueChange = { bio = it },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 3,
-                maxLines = 5,
-                shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = DeepTheme.extended.border
-                )
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                shape = RoundedCornerShape(24.dp),
+                backgroundColor = DeepTheme.extended.surfaceElevated,
+                elevation = 20.dp
             ) {
-                Box(
+                Column(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable(enabled = !isUpdating, onClick = onDismiss)
-                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                        .fillMaxWidth()
+                        .padding(22.dp)
                 ) {
                     Text(
-                        text = "取消",
-                        fontSize = 13.sp,
-                        color = DeepTheme.extended.textTertiary
+                        text = "修改个人资料",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.primary)
-                        .clickable(enabled = !isUpdating) { onConfirm(nickname, bio) }
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                ) {
-                    if (isUpdating) {
-                        CircularProgressIndicator(
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(16.dp),
-                            color = MaterialTheme.colorScheme.onPrimary
+                    Text(
+                        text = "昵称",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = DeepTheme.extended.textSecondary
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = nickname,
+                        onValueChange = { nickname = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = DeepTheme.extended.border
                         )
-                    } else {
-                        Text(
-                            text = "保存",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimary
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = "个人简介",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = DeepTheme.extended.textSecondary
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = bio,
+                        onValueChange = { bio = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        maxLines = 5,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = DeepTheme.extended.border
                         )
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.dp, DeepTheme.extended.border, RoundedCornerShape(12.dp))
+                                .clickable(enabled = !isUpdating, onClick = onDismiss),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "取消",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = DeepTheme.extended.textSecondary
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.primary)
+                                .clickable(enabled = !isUpdating) { onConfirm(nickname, bio) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isUpdating) {
+                                CircularProgressIndicator(
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(16.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            } else {
+                                Text(
+                                    text = "保存",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
+                        }
                     }
                 }
             }

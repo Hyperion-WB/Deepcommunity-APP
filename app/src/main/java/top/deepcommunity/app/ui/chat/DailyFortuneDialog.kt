@@ -18,7 +18,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -44,6 +45,7 @@ import top.deepcommunity.app.core.common.Resource
 import top.deepcommunity.app.core.designsystem.component.DeepButton
 import top.deepcommunity.app.core.designsystem.component.GlassBox
 import top.deepcommunity.app.core.designsystem.theme.LocalExtendedColors
+import top.deepcommunity.app.core.designsystem.theme.DeepTheme
 import top.deepcommunity.app.data.model.FortuneResultDto
 import top.deepcommunity.app.data.model.FortuneStatusDto
 import top.deepcommunity.app.data.repository.ChatRepository
@@ -73,26 +75,34 @@ fun DailyFortuneDialog(
         }
     }
 
-    BasicAlertDialog(
+    Dialog(
         onDismissRequest = { if (!isDrawing) onDismissRequest() },
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.background)
-            .border(1.dp, extColors.glassBorder, RoundedCornerShape(20.dp))
-            .padding(20.dp)
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "每日求签",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+            GlassBox(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                backgroundColor = DeepTheme.extended.surfaceElevated,
+                elevation = 20.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(22.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "每日求签",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
 
             Spacer(modifier = Modifier.height(4.dp))
 
@@ -275,4 +285,6 @@ fun DailyFortuneDialog(
             }
         }
     }
+}
+}
 }
