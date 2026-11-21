@@ -58,10 +58,23 @@ class UserRepository @Inject constructor(
             if (response.isSuccessful) {
                 emit(Resource.Success(response.body()?.message ?: "签到成功"))
             } else {
-                emit(Resource.Error("今日已签到或签到失败"))
+                val errorMsg = try {
+                    val raw = response.errorBody()?.string() ?: ""
+                    if (raw.contains("detail")) {
+                        val json = org.json.JSONObject(raw)
+                        json.optString("detail", "今日已完成签到")
+                    } else if (raw.isNotBlank()) {
+                        raw
+                    } else {
+                        "今日已完成签到"
+                    }
+                } catch (e: Exception) {
+                    "今日已完成签到"
+                }
+                emit(Resource.Error(errorMsg, response.code()))
             }
         } catch (e: Exception) {
-            emit(Resource.Error(e.localizedMessage ?: "签到异常"))
+            emit(Resource.Error(e.localizedMessage ?: "签到网络异常"))
         }
     }.flowOn(Dispatchers.IO)
 

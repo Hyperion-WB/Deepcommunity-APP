@@ -192,11 +192,70 @@ fun HomeScreen(
                 }
             }
 
-            // 右侧功能操作区：搜索与榜单
+            // 右侧功能操作区：打卡、搜索与榜单
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // 首页一键打卡胶囊（未打卡高亮，打卡后变绿色已打卡，防重复点击）
+                val isChecked = uiState.isCheckedIn
+                Row(
+                    modifier = Modifier
+                        .height(36.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(
+                            if (isChecked) Color(0xFF10B981).copy(alpha = 0.12f)
+                            else MaterialTheme.colorScheme.primary
+                        )
+                        .border(
+                            0.8.dp,
+                            if (isChecked) Color(0xFF10B981).copy(alpha = 0.35f)
+                            else MaterialTheme.colorScheme.primary,
+                            RoundedCornerShape(18.dp)
+                        )
+                        .clickable(enabled = !uiState.isCheckingIn) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            if (isChecked) {
+                                Toast.makeText(context, "今日已完成打卡，明天再来哦~", Toast.LENGTH_SHORT).show()
+                            } else {
+                                viewModel.checkIn { success, msg ->
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                        .padding(horizontal = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (uiState.isCheckingIn) {
+                        CircularProgressIndicator(
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(13.dp),
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    } else if (isChecked) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = "已打卡",
+                            tint = Color(0xFF10B981),
+                            modifier = Modifier.size(14.dp)
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Bolt,
+                            contentDescription = "打卡",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                    Text(
+                        text = if (isChecked) "已打卡" else "打卡",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isChecked) Color(0xFF10B981) else MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+
                 // 搜索按钮
                 Box(
                     modifier = Modifier
@@ -237,7 +296,7 @@ fun HomeScreen(
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             showLeaderboards = true
                         }
-                        .padding(horizontal = 12.dp),
+                        .padding(horizontal = 11.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -245,7 +304,7 @@ fun HomeScreen(
                         imageVector = Icons.Outlined.Leaderboard,
                         contentDescription = "全站榜单",
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(15.dp)
+                        modifier = Modifier.size(14.dp)
                     )
                     Text(
                         text = "榜单",

@@ -35,28 +35,57 @@ class TokenManager @Inject constructor(
         }
     }
 
+    private val backupPrefs: SharedPreferences by lazy {
+        context.getSharedPreferences("deep_auth_fallback_prefs", Context.MODE_PRIVATE)
+    }
+
     private val _isLoggedIn = MutableStateFlow(!getAccessToken().isNullOrBlank())
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
 
     fun getAccessToken(): String? {
-        return prefs.getString(Constants.KEY_ACCESS_TOKEN, null)
+        val primary = try {
+            prefs.getString(Constants.KEY_ACCESS_TOKEN, null)
+        } catch (e: Exception) {
+            null
+        }
+        return primary ?: backupPrefs.getString(Constants.KEY_ACCESS_TOKEN, null)
     }
 
     fun saveAccessToken(token: String) {
-        prefs.edit().putString(Constants.KEY_ACCESS_TOKEN, token).apply()
+        try {
+            prefs.edit().putString(Constants.KEY_ACCESS_TOKEN, token).apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        backupPrefs.edit().putString(Constants.KEY_ACCESS_TOKEN, token).apply()
         _isLoggedIn.value = true
     }
 
     fun saveCurrentUserJson(userJson: String) {
-        prefs.edit().putString(Constants.KEY_CURRENT_USER_JSON, userJson).apply()
+        try {
+            prefs.edit().putString(Constants.KEY_CURRENT_USER_JSON, userJson).apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        backupPrefs.edit().putString(Constants.KEY_CURRENT_USER_JSON, userJson).apply()
     }
 
     fun getCurrentUserJson(): String? {
-        return prefs.getString(Constants.KEY_CURRENT_USER_JSON, null)
+        val primary = try {
+            prefs.getString(Constants.KEY_CURRENT_USER_JSON, null)
+        } catch (e: Exception) {
+            null
+        }
+        return primary ?: backupPrefs.getString(Constants.KEY_CURRENT_USER_JSON, null)
     }
 
     fun clearAll() {
-        prefs.edit().clear().apply()
+        try {
+            prefs.edit().clear().apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        backupPrefs.edit().clear().apply()
         _isLoggedIn.value = false
     }
 }

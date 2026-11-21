@@ -48,6 +48,11 @@ class WebSocketManager @Inject constructor(
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
+                val trimmed = text.trim()
+                // 忽略 WebSocket 心跳 pong 回应，避免打扰业务层触发无意义的重刷与滚动
+                if (trimmed == "pong" || trimmed == "{\"type\":\"pong\"}" || trimmed.contains(""""type":"pong"""")) {
+                    return
+                }
                 scope.launch {
                     _incomingMessages.emit(text)
                 }

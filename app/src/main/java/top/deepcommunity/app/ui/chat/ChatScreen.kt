@@ -185,19 +185,16 @@ fun ChatScreen(
 
     var unreadNewCount by remember { mutableIntStateOf(0) }
 
-    // 监听当前用户是否处于列表最底部附近（最后一条已在可见范围内）
-    val isNearBottom by remember {
+    // 判定用户是否正严格停留在列表最底部（没有向上翻看，且当前手势未在滑动）
+    val isStrictlyAtBottom by remember {
         derivedStateOf {
-            val total = listState.layoutInfo.totalItemsCount
-            if (total == 0) return@derivedStateOf true
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            lastVisible >= total - 2
+            !listState.canScrollForward && !listState.isScrollInProgress
         }
     }
 
-    // 当用户手动滑回底部时，自动清除未读新消息提示计数
-    LaunchedEffect(isNearBottom) {
-        if (isNearBottom) {
+    // 当用户手动滑回最底部时，自动清除未读新消息提示计数
+    LaunchedEffect(isStrictlyAtBottom) {
+        if (isStrictlyAtBottom) {
             unreadNewCount = 0
         }
     }
@@ -228,13 +225,14 @@ fun ChatScreen(
                     }
                 }
                 is ChatEvent.IncomingNewMessage -> {
-                    if (isNearBottom) {
-                        // 用户当前本来就在底部，自然平滑下滚
+                    // 仅当用户停留在最底部且未在拖拽滑动时，才平滑滚动到最新；
+                    // 用户只要往上翻看历史记录（canScrollForward 为 true），新消息绝对不自动滚动打扰，只累加右下角胶囊未读数！
+                    val atBottom = !listState.canScrollForward && !listState.isScrollInProgress
+                    if (atBottom) {
                         if (uiState.messages.isNotEmpty()) {
                             listState.animateScrollToItem(uiState.messages.size - 1)
                         }
                     } else {
-                        // 用户正在往上翻看历史消息，绝不强制滚动打扰阅读，仅累加新消息提示
                         unreadNewCount += 1
                     }
                 }
@@ -628,6 +626,8 @@ fun ChatScreen(
                         },
                         onImageClick = { previewChatImageUrl = it },
                         onCollectSticker = viewModel::collectSticker,
+                        onChainClick = { showIdiomChainSheet = true },
+                        onFortuneClick = { showDailyFortuneDialog = true },
                         onUserClick = { uName, uId ->
                             selectedChatUsername = uName
                             selectedChatUserId = uId
@@ -1081,6 +1081,8 @@ private fun ChatMessageBubble(
     onCopyClick: () -> Unit,
     onImageClick: (String) -> Unit = {},
     onCollectSticker: (String) -> Unit = {},
+    onChainClick: () -> Unit = {},
+    onFortuneClick: () -> Unit = {},
     onUserClick: (username: String?, userId: String?) -> Unit = { _, _ -> }
 ) {
     // 若消息已撤回
@@ -1294,6 +1296,95 @@ private fun ChatMessageBubble(
                                     text = "群等级经验已到账",
                                     fontSize = 9.sp,
                                     color = if (isMe) Color.White.copy(alpha = 0.7f) else DeepTheme.extended.textTertiary
+                                )
+                            }
+                        }
+                    } else if (parsed.isChain) {
+                        // 3. 成语接龙机器人卡片（点击卡片直接进入接龙）
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onChainClick() }
+                                .padding(vertical = 4.dp, horizontal = 2.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(text = "🔗", fontSize = 16.sp)
+                                Text(
+                                    text = "成语接龙 · 互动机器人",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = parsed.pureText,
+                                fontSize = 13.sp,
+                                lineHeight = 18.sp,
+                                color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isMe) Color.White.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "点击参与接龙 ›",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isMe) Color.White else MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    } else if (parsed.isFortune) {
+                        // 4. 每日求签卡片
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onFortuneClick() }
+                                .padding(vertical = 4.dp, horizontal = 2.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(text = "🏮", fontSize = 16.sp)
+                                Text(
+                                    text = "每日求签 · 互动机器人",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = parsed.pureText,
+                                fontSize = 13.sp,
+                                lineHeight = 18.sp,
+                                color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isMe) Color.White.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "点击去抽签 ›",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isMe) Color.White else MaterialTheme.colorScheme.primary
                                 )
                             }
                         }

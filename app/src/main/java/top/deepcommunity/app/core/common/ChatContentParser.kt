@@ -8,7 +8,9 @@ data class ParsedChatContent(
     val isPureImage: Boolean,
     val isDice: Boolean,
     val dicePoints: Int? = null,
-    val isCheckin: Boolean
+    val isCheckin: Boolean,
+    val isChain: Boolean = false,
+    val isFortune: Boolean = false
 )
 
 object ChatContentParser {
@@ -58,13 +60,17 @@ object ChatContentParser {
             if (textMatcher.find()) {
                 val extracted = textMatcher.group(1)?.replace("\\\"", "\"")?.replace("\\n", "\n") ?: ""
                 if (extracted.isNotBlank()) {
+                    val isChain = msgType == "chain" || extracted.contains("成语接龙") || extracted.contains("接龙")
+                    val isFortune = msgType == "fortune" || extracted.contains("签文") || extracted.contains("求签")
                     return ParsedChatContent(
                         pureText = extracted,
                         imageUrls = emptyList(),
                         isPureImage = false,
                         isDice = false,
                         dicePoints = null,
-                        isCheckin = false
+                        isCheckin = false,
+                        isChain = isChain,
+                        isFortune = isFortune
                     )
                 }
             }

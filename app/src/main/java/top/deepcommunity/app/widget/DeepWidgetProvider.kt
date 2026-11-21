@@ -203,23 +203,60 @@ class DeepWidgetProvider : AppWidgetProvider() {
     @InstallIn(SingletonComponent::class)
     interface WidgetEntryPoint {
         fun tokenManager(): TokenManager
+        fun userRepository(): top.deepcommunity.app.data.repository.UserRepository
     }
 
-    private fun performWidgetCheckin(context: Context): String {
+    private suspend fun performWidgetCheckin(context: Context): String {
         return try {
             val appContext = context.applicationContext
-            // 使用 EncryptedSharedPreferences 管理器获取解密后的真实 Token
-            val token = try {
-                val entryPoint = EntryPointAccessors.fromApplication(appContext, WidgetEntryPoint::class.java)
-                entryPoint.tokenManager().getAccessToken()
+            val entryPoint = try {
+                EntryPointAccessors.fromApplication(appContext, WidgetEntryPoint::class.java)
             } catch (e: Exception) {
-                TokenManager(appContext).getAccessToken()
+                null
             }
+
+            val tokenManager = entryPoint?.tokenManager() ?: TokenManager(appContext)
+            val token = tokenManager.getAccessToken()
 
             if (token.isNullOrBlank()) {
                 return "请先打开深度社区登录账号"
             }
 
+            val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+
+            // 优先通过注入的 UserRepository 执行打卡（自动享受 CookieJar、TokenAuthenticator 自动静默刷新）
+            if (entryPoint != null) {
+                var message = "✓ 今日已经完成打卡"
+                entryPoint.userRepository().checkIn().collect { res ->
+                    when (res) {
+                        is top.deepcommunity.app.core.common.Resource.Success -> {
+                            try {
+                                appContext.getSharedPreferences("app_checkin_prefs", Context.MODE_PRIVATE)
+                                    .edit().putString("last_checkin_date", todayStr).apply()
+                            } catch (e: Exception) { e.printStackTrace() }
+                            message = "⚡ 今日签到成功！经验 +5"
+                        }
+                        is top.deepcommunity.app.core.common.Resource.Error -> {
+                            val err = res.message
+                            if (err.contains("已经") || err.contains("已完成") || err.contains("已签到")) {
+                                try {
+                                    appContext.getSharedPreferences("app_checkin_prefs", Context.MODE_PRIVATE)
+                                        .edit().putString("last_checkin_date", todayStr).apply()
+                                } catch (e: Exception) { e.printStackTrace() }
+                                message = "✓ 今日已经完成签到打卡"
+                            } else if (res.code == 401) {
+                                message = "登录已过期，请打开应用重新登录"
+                            } else {
+                                message = err.ifBlank { "今日已完成签到打卡" }
+                            }
+                        }
+                        else -> {}
+                    }
+                }
+                return message
+            }
+
+            // 兜底直接网络请求
             val client = OkHttpClient.Builder()
                 .connectTimeout(6, TimeUnit.SECONDS)
                 .readTimeout(6, TimeUnit.SECONDS)
@@ -232,7 +269,6 @@ class DeepWidgetProvider : AppWidgetProvider() {
                 .header("Authorization", "Bearer $token")
                 .build()
 
-            val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
             val response = client.newCall(request).execute()
             if (response.isSuccessful) {
                 try {
@@ -242,7 +278,7 @@ class DeepWidgetProvider : AppWidgetProvider() {
                 "⚡ 今日签到成功！经验 +5"
             } else {
                 val errorBody = response.body?.string() ?: ""
-                if (errorBody.contains("已经完成") || errorBody.contains("今日已经") || response.code == 400) {
+                if (errorBody.contains("已经") || errorBody.contains("今日已经") || response.code == 400) {
                     try {
                         appContext.getSharedPreferences("app_checkin_prefs", Context.MODE_PRIVATE)
                             .edit().putString("last_checkin_date", todayStr).apply()

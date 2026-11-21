@@ -81,15 +81,28 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun checkTodayCheckinStatus() {
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         try {
             val prefs = context.getSharedPreferences("app_checkin_prefs", Context.MODE_PRIVATE)
-            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
             val lastCheckinDate = prefs.getString("last_checkin_date", null)
             if (lastCheckinDate == today) {
                 _uiState.update { it.copy(isCheckedIn = true) }
             }
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+
+        // 异步向服务端核验今日打卡状态，同步多端与网页端签到结果
+        viewModelScope.launch {
+            userRepository.getCheckinStatus().collect { res ->
+                if (res is Resource.Success && res.data.checkedToday) {
+                    try {
+                        context.getSharedPreferences("app_checkin_prefs", Context.MODE_PRIVATE)
+                            .edit().putString("last_checkin_date", today).apply()
+                    } catch (e: Exception) { e.printStackTrace() }
+                    _uiState.update { it.copy(isCheckedIn = true) }
+                }
+            }
         }
     }
 
