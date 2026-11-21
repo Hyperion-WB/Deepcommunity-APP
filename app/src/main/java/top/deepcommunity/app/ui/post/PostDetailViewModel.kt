@@ -23,6 +23,7 @@ import top.deepcommunity.app.data.model.CommentDto
 import top.deepcommunity.app.data.model.PollDetailDto
 import top.deepcommunity.app.data.model.PostItemDto
 import top.deepcommunity.app.data.model.QaQuestionStateDto
+import top.deepcommunity.app.data.model.ReactionSummaryDto
 import top.deepcommunity.app.data.model.StickerItemDto
 import top.deepcommunity.app.data.repository.ChatRepository
 import top.deepcommunity.app.data.repository.PostRepository
@@ -48,6 +49,8 @@ data class PostDetailUiState(
     val attachedImageUrl: String? = null,
     val attachedImageKind: String? = null, // "photo" 或 "sticker"
     val qaState: QaQuestionStateDto? = null,
+    val postReactions: ReactionSummaryDto = ReactionSummaryDto(),
+    val commentReactions: Map<String, ReactionSummaryDto> = emptyMap(),
     val errorMessage: String? = null
 )
 
@@ -81,6 +84,28 @@ class PostDetailViewModel @Inject constructor(
         loadComments()
         loadPoll()
         loadQaState()
+        loadPostReactions()
+    }
+
+    fun loadPostReactions() {
+        viewModelScope.launch {
+            postRepository.getReactionSummary(targetType = "post", targetId = postId).collect { res ->
+                if (res is Resource.Success) {
+                    _uiState.update { it.copy(postReactions = res.data) }
+                }
+            }
+        }
+    }
+
+    fun loadCommentsReactions(commentIds: List<String>) {
+        if (commentIds.isEmpty()) return
+        viewModelScope.launch {
+            postRepository.getReactionBatch(targetType = "comment", targetIds = commentIds).collect { res ->
+                if (res is Resource.Success) {
+                    _uiState.update { it.copy(commentReactions = res.data.items) }
+                }
+            }
+        }
     }
 
     fun loadQaState() {
@@ -155,6 +180,7 @@ class PostDetailViewModel @Inject constructor(
             postRepository.getComments(postId).collect { result ->
                 if (result is Resource.Success) {
                     _uiState.update { it.copy(comments = result.data) }
+                    loadCommentsReactions(result.data.map { it.id })
                 }
             }
         }
@@ -452,7 +478,24 @@ class PostDetailViewModel @Inject constructor(
                 when (result) {
                     is Resource.Success -> {
                         _eventFlow.emit(PostDetailEvent.ShowToast("已回应 $emoji"))
-                        loadPostDetail()
+                        loadPostReactions()
+                    }
+                    is Resource.Error -> {
+                        _eventFlow.emit(PostDetailEvent.ShowToast(result.message))
+                    }
+                    else -> {}
+                }
+            }
+        }
+    }
+
+    fun toggleCommentReaction(commentId: String, emoji: String) {
+        viewModelScope.launch {
+            postRepository.toggleReaction(targetType = "comment", targetId = commentId, emoji = emoji).collect { result ->
+                when (result) {
+                    is Resource.Success -> {
+                        _eventFlow.emit(PostDetailEvent.ShowToast("已回应 $emoji"))
+                        loadCommentsReactions(listOf(commentId))
                     }
                     is Resource.Error -> {
                         _eventFlow.emit(PostDetailEvent.ShowToast(result.message))

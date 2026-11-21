@@ -24,6 +24,7 @@ import top.deepcommunity.app.data.model.GroupCheckinStatusDto
 import top.deepcommunity.app.data.model.GroupMemberDto
 import top.deepcommunity.app.data.model.StickerItemDto
 import top.deepcommunity.app.data.repository.AuthRepository
+import top.deepcommunity.app.data.repository.BattleRepository
 import top.deepcommunity.app.data.repository.ChatRepository
 import top.deepcommunity.app.data.repository.PostRepository
 import top.deepcommunity.app.data.repository.UserRepository
@@ -78,12 +79,14 @@ class ChatViewModel @Inject constructor(
     private val postRepository: PostRepository,
     private val authRepository: AuthRepository,
     private val userRepository: UserRepository,
+    private val battleRepository: BattleRepository,
     @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     val chatRepo: ChatRepository get() = chatRepository
     val userRepo: UserRepository get() = userRepository
+    val battleRepo: BattleRepository get() = battleRepository
     val convId: String = checkNotNull(savedStateHandle["convId"])
 
     private val _uiState = MutableStateFlow(ChatUiState())

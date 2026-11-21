@@ -12,6 +12,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import top.deepcommunity.app.core.common.Constants
 import top.deepcommunity.app.data.api.AuthApi
+import top.deepcommunity.app.data.api.BattleApi
 import top.deepcommunity.app.data.api.ChatApi
 import top.deepcommunity.app.data.api.PostApi
 import top.deepcommunity.app.data.api.UserApi
@@ -82,4 +83,8 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideUserApi(retrofit: Retrofit): UserApi = retrofit.create(UserApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideBattleApi(retrofit: Retrofit): BattleApi = retrofit.create(BattleApi::class.java)
 }

@@ -17,6 +17,10 @@ import top.deepcommunity.app.data.model.FortuneStatusDto
 import top.deepcommunity.app.data.model.GroupApplyRequestDto
 import top.deepcommunity.app.data.model.GroupCheckinStatusDto
 import top.deepcommunity.app.data.model.GroupMemberDto
+import top.deepcommunity.app.data.model.GroupPollCreateRequest
+import top.deepcommunity.app.data.model.GroupPollDto
+import top.deepcommunity.app.data.model.GroupPollListDto
+import top.deepcommunity.app.data.model.GroupPollVoteRequest
 import top.deepcommunity.app.data.model.GroupRoomDto
 import top.deepcommunity.app.data.model.IdiomAnswerRequest
 import top.deepcommunity.app.data.model.IdiomAnswerResponse
@@ -518,6 +522,77 @@ class ChatRepository @Inject constructor(
             }
         } catch (e: Exception) {
             emit(Resource.Error(e.localizedMessage ?: "网络错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    // 群投票 Group Polls
+    fun getGroupPolls(roomId: String): Flow<Resource<List<GroupPollDto>>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.getGroupPolls(roomId)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!.items))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "获取群投票列表失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络异常"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun getGroupPollDetail(roomId: String, pollId: String): Flow<Resource<GroupPollDto>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.getGroupPollDetail(roomId, pollId)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "获取投票详情失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络异常"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun createGroupPoll(
+        roomId: String,
+        title: String,
+        options: List<String>,
+        isMultiple: Boolean = false,
+        maxChoices: Int = 1,
+        durationHours: Int = 72
+    ): Flow<Resource<String>> = flow {
+        emit(Resource.Loading)
+        try {
+            val req = GroupPollCreateRequest(
+                title = title.trim(),
+                options = options.map { it.trim() }.filter { it.isNotBlank() },
+                isMultiple = isMultiple,
+                maxChoices = if (isMultiple) maxChoices else 1,
+                durationHours = durationHours
+            )
+            val response = chatApi.createGroupPoll(roomId, req)
+            if (response.isSuccessful) {
+                emit(Resource.Success("群投票已成功发起"))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "创建投票失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络异常"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun voteGroupPoll(roomId: String, pollId: String, optionIds: List<Int>): Flow<Resource<GroupPollDto>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = chatApi.voteGroupPoll(roomId, pollId, GroupPollVoteRequest(optionIds))
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error(parseError(response.errorBody()?.string()) ?: "投票失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "网络异常"))
         }
     }.flowOn(Dispatchers.IO)
 

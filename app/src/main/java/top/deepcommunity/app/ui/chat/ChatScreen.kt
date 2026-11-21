@@ -75,6 +75,8 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Poll
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Casino
@@ -173,6 +175,8 @@ fun ChatScreen(
     var selectedChatUsername by remember { mutableStateOf<String?>(null) }
     var showDailyFortuneDialog by remember { mutableStateOf(false) }
     var showIdiomChainSheet by remember { mutableStateOf(false) }
+    var showGroupPollSheet by remember { mutableStateOf(false) }
+    var showBattleSheet by remember { mutableStateOf(false) }
 
     // 相册选图发送
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -306,6 +310,16 @@ fun ChatScreen(
                             onDismissRequest = { showPrivateMenu = false }
                         ) {
                             DropdownMenuItem(
+                                text = { Text("发起极客对战 ⚔️") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.SportsEsports, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                },
+                                onClick = {
+                                    showPrivateMenu = false
+                                    showBattleSheet = true
+                                }
+                            )
+                            DropdownMenuItem(
                                 text = { Text("加入黑名单 / 屏蔽消息", color = MaterialTheme.colorScheme.error) },
                                 leadingIcon = {
                                     Icon(Icons.Default.Block, contentDescription = null, tint = MaterialTheme.colorScheme.error)
@@ -420,6 +434,16 @@ fun ChatScreen(
                             icon = Icons.Outlined.Translate,
                             label = "成语接龙",
                             onClick = { showIdiomChainSheet = true }
+                        )
+                        GroupActionChip(
+                            icon = Icons.Default.Poll,
+                            label = "群投票",
+                            onClick = { showGroupPollSheet = true }
+                        )
+                        GroupActionChip(
+                            icon = Icons.Default.SportsEsports,
+                            label = "极客对战",
+                            onClick = { showBattleSheet = true }
                         )
                     }
                 }
@@ -628,6 +652,7 @@ fun ChatScreen(
                         onCollectSticker = viewModel::collectSticker,
                         onChainClick = { showIdiomChainSheet = true },
                         onFortuneClick = { showDailyFortuneDialog = true },
+                        onPollClick = { showGroupPollSheet = true },
                         onUserClick = { uName, uId ->
                             selectedChatUsername = uName
                             selectedChatUserId = uId
@@ -874,6 +899,25 @@ fun ChatScreen(
                 onDismissRequest = { showIdiomChainSheet = false }
             )
         }
+
+        // 社群群投票抽屉
+        if (showGroupPollSheet) {
+            GroupPollBottomSheet(
+                roomId = viewModel.convId,
+                chatRepository = viewModel.chatRepo,
+                onDismissRequest = { showGroupPollSheet = false }
+            )
+        }
+
+        // 极客棋类对战抽屉
+        if (showBattleSheet) {
+            BattleGameBottomSheet(
+                battleRepository = viewModel.battleRepo,
+                currentUserId = uiState.currentUserId,
+                targetUserId = if (!uiState.isGroupChat) viewModel.convId else null,
+                onDismissRequest = { showBattleSheet = false }
+            )
+        }
     }
 }
 
@@ -1083,6 +1127,7 @@ private fun ChatMessageBubble(
     onCollectSticker: (String) -> Unit = {},
     onChainClick: () -> Unit = {},
     onFortuneClick: () -> Unit = {},
+    onPollClick: () -> Unit = {},
     onUserClick: (username: String?, userId: String?) -> Unit = { _, _ -> }
 ) {
     // 若消息已撤回
@@ -1382,6 +1427,51 @@ private fun ChatMessageBubble(
                             ) {
                                 Text(
                                     text = "点击去抽签 ›",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isMe) Color.White else MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    } else if (parsed.isPoll) {
+                        // 5. 群投票卡片（点击卡片直接参与群投票）
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onPollClick() }
+                                .padding(vertical = 4.dp, horizontal = 2.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(text = "📊", fontSize = 16.sp)
+                                Text(
+                                    text = "群投票 · 互动机器人",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = parsed.pureText,
+                                fontSize = 13.sp,
+                                lineHeight = 18.sp,
+                                color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isMe) Color.White.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "点击参与群投票 ›",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = if (isMe) Color.White else MaterialTheme.colorScheme.primary

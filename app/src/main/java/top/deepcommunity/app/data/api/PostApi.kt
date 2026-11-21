@@ -28,6 +28,8 @@ import top.deepcommunity.app.data.model.QaSettleRequest
 import top.deepcommunity.app.data.model.PollDetailDto
 import top.deepcommunity.app.data.model.PollVoteRequest
 import top.deepcommunity.app.data.model.PostItemDto
+import top.deepcommunity.app.data.model.ReactionBatchDto
+import top.deepcommunity.app.data.model.ReactionSummaryDto
 import top.deepcommunity.app.data.model.ReactionToggleRequest
 import top.deepcommunity.app.data.model.SaveDraftRequest
 import top.deepcommunity.app.data.model.SystemAnnouncementDto
@@ -75,7 +77,7 @@ interface PostApi {
     suspend fun votePoll(
         @Path("poll_id") pollId: String,
         @Body request: PollVoteRequest
-    ): Response<MessageResponse>
+    ): Response<PollDetailDto>
 
     // 草稿
     @GET("api/posts/drafts")
@@ -126,6 +128,18 @@ interface PostApi {
     // 表情回应 Reactions
     @POST("api/reactions/toggle")
     suspend fun toggleReaction(@Body request: ReactionToggleRequest): Response<okhttp3.ResponseBody>
+
+    @GET("api/reactions/summary")
+    suspend fun getReactionSummary(
+        @Query("target_type") targetType: String,
+        @Query("target_id") targetId: String
+    ): Response<ReactionSummaryDto>
+
+    @GET("api/reactions/batch")
+    suspend fun getReactionBatch(
+        @Query("target_type") targetType: String,
+        @Query("target_ids") targetIds: String
+    ): Response<ReactionBatchDto>
 
     // 全站广播系统公告
     @GET("api/admin/announcement/current")

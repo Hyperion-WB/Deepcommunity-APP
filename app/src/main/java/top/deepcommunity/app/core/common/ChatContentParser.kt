@@ -10,7 +10,8 @@ data class ParsedChatContent(
     val dicePoints: Int? = null,
     val isCheckin: Boolean,
     val isChain: Boolean = false,
-    val isFortune: Boolean = false
+    val isFortune: Boolean = false,
+    val isPoll: Boolean = false
 )
 
 object ChatContentParser {
@@ -62,6 +63,7 @@ object ChatContentParser {
                 if (extracted.isNotBlank()) {
                     val isChain = msgType == "chain" || extracted.contains("成语接龙") || extracted.contains("接龙")
                     val isFortune = msgType == "fortune" || extracted.contains("签文") || extracted.contains("求签")
+                    val isPoll = msgType == "poll" || extracted.contains("投票")
                     return ParsedChatContent(
                         pureText = extracted,
                         imageUrls = emptyList(),
@@ -70,7 +72,8 @@ object ChatContentParser {
                         dicePoints = null,
                         isCheckin = false,
                         isChain = isChain,
-                        isFortune = isFortune
+                        isFortune = isFortune,
+                        isPoll = isPoll
                     )
                 }
             }

@@ -103,6 +103,7 @@ import top.deepcommunity.app.core.designsystem.theme.DeepMotion
 import top.deepcommunity.app.core.designsystem.theme.DeepTheme
 import top.deepcommunity.app.data.model.CommentDto
 import top.deepcommunity.app.data.model.PollDetailDto
+import top.deepcommunity.app.data.model.ReactionSummaryDto
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -592,38 +593,66 @@ fun PostDetailScreen(
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            // 表情回应 Reactions 快捷药丸条
+                            // 表情回应 Reactions 极客态度条（展示实时数量与高亮已选）
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(DeepTheme.extended.surfaceElevated.copy(alpha = 0.5f))
                                     .border(0.8.dp, DeepTheme.extended.border, RoundedCornerShape(12.dp))
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    .padding(horizontal = 10.dp, vertical = 7.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    text = "态度回应",
+                                    text = "极客态度",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = DeepTheme.extended.textTertiary
                                 )
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     val emojis = listOf("👍", "❤️", "🚀", "💡", "🎉", "🔥")
+                                    val summary = uiState.postReactions
                                     emojis.forEach { emoji ->
+                                        val count = summary.counts[emoji] ?: 0
+                                        val isSelected = summary.userReactions.contains(emoji)
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(8.dp))
-                                                .background(MaterialTheme.colorScheme.surface)
+                                                .background(
+                                                    if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                                    else MaterialTheme.colorScheme.surface
+                                                )
+                                                .border(
+                                                    0.8.dp,
+                                                    if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+                                                    else DeepTheme.extended.border.copy(alpha = 0.5f),
+                                                    RoundedCornerShape(8.dp)
+                                                )
                                                 .clickable {
                                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                                     viewModel.toggleReaction(emoji)
                                                 }
-                                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                                                .padding(horizontal = 7.dp, vertical = 3.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text(text = emoji, fontSize = 15.sp)
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                            ) {
+                                                Text(text = emoji, fontSize = 13.sp)
+                                                if (count > 0) {
+                                                    Text(
+                                                        text = "$count",
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = if (isSelected) MaterialTheme.colorScheme.primary else DeepTheme.extended.textSecondary
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -643,10 +672,14 @@ fun PostDetailScreen(
                     items(uiState.comments, key = { it.id }) { comment ->
                         CommentItem(
                             comment = comment,
+                            reactions = uiState.commentReactions[comment.id],
                             onReplyClick = { commentId, authorName ->
                                 viewModel.setReplyTo(commentId, authorName)
                             },
                             onCommentLikeClick = viewModel::toggleCommentLike,
+                            onCommentReactionClick = { emoji ->
+                                viewModel.toggleCommentReaction(comment.id, emoji)
+                            },
                             onImageClick = { previewImageUrl = it },
                             onAvatarLongClick = { username ->
                                 viewModel.appendText("@$username ")
@@ -721,8 +754,10 @@ fun PostDetailScreen(
 @Composable
 private fun CommentItem(
     comment: CommentDto,
+    reactions: ReactionSummaryDto? = null,
     onReplyClick: (String, String) -> Unit,
     onCommentLikeClick: (String) -> Unit,
+    onCommentReactionClick: (String) -> Unit = {},
     onImageClick: (String) -> Unit,
     onAvatarLongClick: (String) -> Unit,
     onUserClick: (username: String?, userId: String?) -> Unit,
@@ -732,6 +767,7 @@ private fun CommentItem(
 ) {
     var isRepliesExpanded by remember { mutableStateOf(false) }
     var isMenuExpanded by remember { mutableStateOf(false) }
+    var showReactionPicker by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     val authorName = comment.displayAuthorName
     val targetUsername = comment.authorUsername?.takeIf { it.isNotBlank() } ?: authorName
@@ -873,6 +909,21 @@ private fun CommentItem(
                     .padding(horizontal = 6.dp, vertical = 4.dp)
             )
 
+            // 态度表情按钮
+            Text(
+                text = "态度",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = DeepTheme.extended.textSecondary,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { showReactionPicker = !showReactionPicker }
+                    .padding(horizontal = 6.dp, vertical = 4.dp)
+            )
+
             // 更多操作下拉菜单（采纳/置顶/举报）
             Box {
                 IconButton(
@@ -943,6 +994,80 @@ private fun CommentItem(
                     .clickable { onImageClick(fullImgUrl) },
                 contentScale = ContentScale.Fit
             )
+        }
+
+        // 评论快捷表情选择器
+        AnimatedVisibility(visible = showReactionPicker) {
+            Row(
+                modifier = Modifier
+                    .padding(start = 40.dp, top = 6.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(DeepTheme.extended.surfaceElevated)
+                    .border(0.8.dp, DeepTheme.extended.border, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf("👍", "❤️", "🚀", "💡", "🎉", "🔥").forEach { emoji ->
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onCommentReactionClick(emoji)
+                                showReactionPicker = false
+                            }
+                            .padding(4.dp)
+                    ) {
+                        Text(text = emoji, fontSize = 14.sp)
+                    }
+                }
+            }
+        }
+
+        // 评论已获得的表情统计胶囊列表
+        if (reactions != null && reactions.counts.any { it.value > 0 }) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.padding(start = 40.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                reactions.counts.filter { it.value > 0 }.forEach { (emoji, count) ->
+                    val isUserVoted = reactions.userReactions.contains(emoji)
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                if (isUserVoted) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                else MaterialTheme.colorScheme.surface
+                            )
+                            .border(
+                                0.8.dp,
+                                if (isUserVoted) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                                else DeepTheme.extended.border.copy(alpha = 0.5f),
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onCommentReactionClick(emoji)
+                            }
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(text = emoji, fontSize = 11.sp)
+                            Text(
+                                text = "$count",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isUserVoted) MaterialTheme.colorScheme.primary else DeepTheme.extended.textSecondary
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         // 二级楼中楼树状回复列表

@@ -16,6 +16,10 @@ import top.deepcommunity.app.data.model.FortuneStatusDto
 import top.deepcommunity.app.data.model.GroupApplyRequestDto
 import top.deepcommunity.app.data.model.GroupCheckinStatusDto
 import top.deepcommunity.app.data.model.GroupMemberDto
+import top.deepcommunity.app.data.model.GroupPollCreateRequest
+import top.deepcommunity.app.data.model.GroupPollDto
+import top.deepcommunity.app.data.model.GroupPollListDto
+import top.deepcommunity.app.data.model.GroupPollVoteRequest
 import top.deepcommunity.app.data.model.IdiomAnswerRequest
 import top.deepcommunity.app.data.model.IdiomAnswerResponse
 import top.deepcommunity.app.data.model.IdiomChainStateDto
@@ -183,4 +187,27 @@ interface ChatApi {
 
     @POST("api/chat/groups/{room_id}/idiom-chain/end")
     suspend fun endIdiomChain(@Path("room_id") roomId: String): Response<MessageResponse>
+
+    // 群投票 Group Polls
+    @GET("api/chat/groups/{room_id}/polls")
+    suspend fun getGroupPolls(@Path("room_id") roomId: String): Response<GroupPollListDto>
+
+    @GET("api/chat/groups/{room_id}/polls/{poll_id}")
+    suspend fun getGroupPollDetail(
+        @Path("room_id") roomId: String,
+        @Path("poll_id") pollId: String
+    ): Response<GroupPollDto>
+
+    @POST("api/chat/groups/{room_id}/polls")
+    suspend fun createGroupPoll(
+        @Path("room_id") roomId: String,
+        @Body request: GroupPollCreateRequest
+    ): Response<okhttp3.ResponseBody>
+
+    @POST("api/chat/groups/{room_id}/polls/{poll_id}/vote")
+    suspend fun voteGroupPoll(
+        @Path("room_id") roomId: String,
+        @Path("poll_id") pollId: String,
+        @Body request: GroupPollVoteRequest
+    ): Response<GroupPollDto>
 }

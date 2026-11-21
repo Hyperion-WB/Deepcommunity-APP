@@ -25,6 +25,8 @@ import top.deepcommunity.app.data.model.PollVoteRequest
 import top.deepcommunity.app.data.model.PostItemDto
 import top.deepcommunity.app.data.model.QaQuestionStateDto
 import top.deepcommunity.app.data.model.QaSettleRequest
+import top.deepcommunity.app.data.model.ReactionBatchDto
+import top.deepcommunity.app.data.model.ReactionSummaryDto
 import top.deepcommunity.app.data.model.ReactionToggleRequest
 import top.deepcommunity.app.data.model.SaveDraftRequest
 import top.deepcommunity.app.data.model.SystemAnnouncementDto
@@ -381,6 +383,39 @@ class PostRepository @Inject constructor(
             }
         } catch (e: Exception) {
             emit(Resource.Error(e.localizedMessage ?: "操作失败"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun getReactionSummary(targetType: String, targetId: String): Flow<Resource<ReactionSummaryDto>> = flow {
+        emit(Resource.Loading)
+        try {
+            val response = postApi.getReactionSummary(targetType, targetId)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("加载表情回应失败"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.localizedMessage ?: "加载表情回应网络异常"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun getReactionBatch(targetType: String, targetIds: List<String>): Flow<Resource<ReactionBatchDto>> = flow {
+        emit(Resource.Loading)
+        try {
+            if (targetIds.isEmpty()) {
+                emit(Resource.Success(ReactionBatchDto()))
+                return@flow
+            }
+            val idsStr = targetIds.joinToString(",")
+            val response = postApi.getReactionBatch(targetType, idsStr)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Success(ReactionBatchDto()))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Success(ReactionBatchDto()))
         }
     }.flowOn(Dispatchers.IO)
 
